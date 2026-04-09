@@ -35,7 +35,7 @@ final class SettingsStore {
     }
 
     func apiKey(for provider: BackendProvider) -> String? {
-        connections[provider]?.apiKey
+        KeychainService.get("apiKey-\(provider.rawValue)")
     }
 
     // MARK: - Init
@@ -90,14 +90,32 @@ final class SettingsStore {
         } else {
             self.defaultModelId = loadedModels.first?.id
         }
+
+        // Migrate API keys from UserDefaults connections to Keychain
+        migrateAPIKeysToKeychain()
+    }
+
+    private func migrateAPIKeysToKeychain() {
+        var changed = false
+        for (provider, conn) in connections {
+            if let key = conn.apiKey, !key.isEmpty {
+                KeychainService.set(key, for: "apiKey-\(provider.rawValue)")
+                connections[provider]?.apiKey = nil
+                changed = true
+            }
+        }
+        if changed { save() }
     }
 
     // MARK: - Mutations
 
     func setAPIKey(_ key: String?, for provider: BackendProvider) {
-        var conn = connections[provider] ?? ProviderConnection()
-        conn.apiKey = (key?.isEmpty == false) ? key : nil
-        connections[provider] = conn
+        let account = "apiKey-\(provider.rawValue)"
+        if let key, !key.isEmpty {
+            KeychainService.set(key, for: account)
+        } else {
+            KeychainService.delete(account)
+        }
     }
 
     func setEndpoint(_ endpoint: URL?, for provider: BackendProvider) {
