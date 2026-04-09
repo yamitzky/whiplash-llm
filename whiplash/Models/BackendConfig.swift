@@ -52,17 +52,48 @@ struct ProviderConnection: Codable, Equatable {
 
 // MARK: - Model Config (self-contained: knows its own provider)
 
+// MARK: - Thinking Config
+
+enum ThinkingConfig: Codable, Equatable {
+    case off
+    case auto
+    case budget(Int)
+
+    var label: String {
+        switch self {
+        case .off: "オフ"
+        case .auto: "自動"
+        case .budget(let n): "Budget: \(n)"
+        }
+    }
+}
+
 struct ModelConfig: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
     var provider: BackendProvider
     var modelIdentifier: String
+    var thinking: ThinkingConfig
 
-    init(id: UUID = UUID(), name: String, provider: BackendProvider, modelIdentifier: String) {
+    init(id: UUID = UUID(), name: String, provider: BackendProvider, modelIdentifier: String, thinking: ThinkingConfig = .off) {
         self.id = id
         self.name = name
         self.provider = provider
         self.modelIdentifier = modelIdentifier
+        self.thinking = thinking
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        provider = try container.decode(BackendProvider.self, forKey: .provider)
+        modelIdentifier = try container.decode(String.self, forKey: .modelIdentifier)
+        thinking = try container.decodeIfPresent(ThinkingConfig.self, forKey: .thinking) ?? .off
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, provider, modelIdentifier, thinking
     }
 
     static let builtinDefaults: [ModelConfig] = [

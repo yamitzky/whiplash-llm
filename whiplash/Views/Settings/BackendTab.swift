@@ -67,9 +67,15 @@ struct BackendTab: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(model.name)
                                 .fontWeight(.medium)
-                            Text("\(model.provider.displayName) / \(model.modelIdentifier)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                Text("\(model.provider.displayName) / \(model.modelIdentifier)")
+                                if model.thinking != .off {
+                                    Text("(\(model.thinking.label))")
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
 
                         Spacer()
@@ -107,6 +113,14 @@ private struct AddModelButton: View {
     @State private var newName = ""
     @State private var newProvider: BackendProvider = .anthropic
     @State private var newModelId = ""
+    @State private var newThinking: ThinkingMode = .off
+    @State private var newBudget = "4096"
+
+    enum ThinkingMode: String, CaseIterable {
+        case off = "オフ"
+        case auto = "自動"
+        case budget = "Budget指定"
+    }
 
     var body: some View {
         if isAdding {
@@ -126,24 +140,41 @@ private struct AddModelButton: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 300)
 
+                if newProvider.supportsThinking {
+                    Picker("Thinking", selection: $newThinking) {
+                        ForEach(ThinkingMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .frame(width: 300)
+
+                    if newThinking == .budget {
+                        TextField("トークン数", text: $newBudget)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 300)
+                    }
+                }
+
                 HStack {
                     Button("追加") {
+                        let thinking: ThinkingConfig = switch newThinking {
+                        case .off: .off
+                        case .auto: .auto
+                        case .budget: .budget(Int(newBudget) ?? 4096)
+                        }
                         let model = ModelConfig(
                             name: newName.isEmpty ? newModelId : newName,
                             provider: newProvider,
-                            modelIdentifier: newModelId
+                            modelIdentifier: newModelId,
+                            thinking: thinking
                         )
                         settingsStore.addModel(model)
-                        isAdding = false
-                        newName = ""
-                        newModelId = ""
+                        resetForm()
                     }
                     .disabled(newModelId.isEmpty)
 
                     Button("キャンセル") {
-                        isAdding = false
-                        newName = ""
-                        newModelId = ""
+                        resetForm()
                     }
                 }
             }
@@ -155,6 +186,23 @@ private struct AddModelButton: View {
                 Label("モデルを追加", systemImage: "plus")
             }
             .buttonStyle(.borderless)
+        }
+    }
+
+    private func resetForm() {
+        isAdding = false
+        newName = ""
+        newModelId = ""
+        newThinking = .off
+        newBudget = "4096"
+    }
+}
+
+extension BackendProvider {
+    var supportsThinking: Bool {
+        switch self {
+        case .anthropic, .gemini, .openAI, .openResponses: true
+        case .foundationModels, .ollama, .lmStudio: false
         }
     }
 }
