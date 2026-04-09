@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		77295E162F84CC9C00758C69 /* MarkdownView in Frameworks */ = {isa = PBXBuildFile; productRef = 77295E152F84CC9C00758C69 /* MarkdownView */; };
+		7765D2F02F82453500BE6284 /* AnyLanguageModel in Frameworks */ = {isa = PBXBuildFile; productRef = 7765D2EF2F82453500BE6284 /* AnyLanguageModel */; };
+		7765D3072F824F1800BE6284 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 7765D3062F824F1800BE6284 /* KeyboardShortcuts */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		7765D2CA2F822A3200BE6284 /* whiplash.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = whiplash.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7765D2F02F82453500BE6284 /* AnyLanguageModel in Frameworks */,
+				7765D3072F824F1800BE6284 /* KeyboardShortcuts in Frameworks */,
+				77295E162F84CC9C00758C69 /* MarkdownView in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +74,9 @@
 			);
 			name = whiplash;
 			packageProductDependencies = (
+				7765D2EF2F82453500BE6284 /* AnyLanguageModel */,
+				7765D3062F824F1800BE6284 /* KeyboardShortcuts */,
+				77295E152F84CC9C00758C69 /* MarkdownView */,
 			);
 			productName = whiplash;
 			productReference = 7765D2CA2F822A3200BE6284 /* whiplash.app */;
@@ -94,6 +106,11 @@
 			);
 			mainGroup = 7765D2C12F822A3200BE6284;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7765D2EE2F82453500BE6284 /* XCRemoteSwiftPackageReference "AnyLanguageModel" */,
+				7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				77295E142F84CC9C00758C69 /* XCRemoteSwiftPackageReference "MarkdownView" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7765D2CB2F822A3200BE6284 /* Products */;
 			projectDirPath = "";
@@ -251,9 +268,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -281,9 +297,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -325,6 +340,51 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		77295E142F84CC9C00758C69 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/LiYanan2004/MarkdownView?tab=readme-ov-file";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.1;
+			};
+		};
+		7765D2EE2F82453500BE6284 /* XCRemoteSwiftPackageReference "AnyLanguageModel" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/AnyLanguageModel";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.8.0;
+			};
+		};
+		7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		77295E152F84CC9C00758C69 /* MarkdownView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 77295E142F84CC9C00758C69 /* XCRemoteSwiftPackageReference "MarkdownView" */;
+			productName = MarkdownView;
+		};
+		7765D2EF2F82453500BE6284 /* AnyLanguageModel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7765D2EE2F82453500BE6284 /* XCRemoteSwiftPackageReference "AnyLanguageModel" */;
+			productName = AnyLanguageModel;
+		};
+		7765D3062F824F1800BE6284 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7765D2C22F822A3200BE6284 /* Project object */;
 }
