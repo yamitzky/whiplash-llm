@@ -97,9 +97,7 @@ final class CaptureFlow: NSObject {
                 return
             }
         } else {
-            print("[Whiplash] startFromClipboard: clipboard empty or unsupported")
-            showError("クリップボードにテキストまたは画像がありません")
-            return
+            print("[Whiplash] startFromClipboard: clipboard empty, continuing without attachment")
         }
 
         showAndProcess(initialAttachments: initialAttachments)
