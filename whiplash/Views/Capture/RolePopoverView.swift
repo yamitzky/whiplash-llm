@@ -103,9 +103,10 @@ struct RoleSelectionView: View {
                     .lineLimit(1...5)
                     .focused($isInputFocused)
                     .onKeyPress(.return, phases: .down) { event in
-                        // Suggestion visible: plain Enter always confirms
+                        // Suggestion visible: plain Enter picks the suggestion (does NOT send)
                         if showingSuggestions && event.modifiers.isEmpty {
-                            handleSubmit()
+                            let index = min(highlightedIndex, suggestions.count - 1)
+                            selectMention(suggestions[index])
                             return .handled
                         }
 
