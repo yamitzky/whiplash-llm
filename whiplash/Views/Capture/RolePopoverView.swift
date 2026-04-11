@@ -103,16 +103,20 @@ struct RoleSelectionView: View {
                     .lineLimit(1...5)
                     .focused($isInputFocused)
                     .onKeyPress(.return, phases: .down) { event in
+                        // Suggestion visible: plain Enter always confirms
+                        if showingSuggestions && event.modifiers.isEmpty {
+                            handleSubmit()
+                            return .handled
+                        }
+
                         let hasControl = event.modifiers.contains(.control)
                         let hasShift = event.modifiers.contains(.shift)
 
                         if enterToSend {
-                            // Enter sends, Shift+Enter for newline
                             if hasShift { return .ignored }
                             handleSubmit()
                             return .handled
                         } else {
-                            // Ctrl+Enter sends, Enter for newline
                             if hasControl {
                                 handleSubmit()
                                 return .handled
