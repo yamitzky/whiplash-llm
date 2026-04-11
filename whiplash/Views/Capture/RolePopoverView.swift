@@ -192,12 +192,12 @@ struct RoleSelectionView: View {
         .onChange(of: inputText) { _, _ in
             highlightedIndex = 0
         }
-        .onKeyPress(.upArrow) {
+        .onKeyPress(.leftArrow) {
             guard showingSuggestions else { return .ignored }
             highlightedIndex = max(0, highlightedIndex - 1)
             return .handled
         }
-        .onKeyPress(.downArrow) {
+        .onKeyPress(.rightArrow) {
             guard showingSuggestions else { return .ignored }
             highlightedIndex = min(suggestions.count - 1, highlightedIndex + 1)
             return .handled
