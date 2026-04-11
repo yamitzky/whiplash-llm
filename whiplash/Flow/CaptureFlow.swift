@@ -201,6 +201,7 @@ final class CaptureFlow: NSObject {
 
         let view = RoleSelectionView(
             roles: roleStore.roles,
+            enterToSend: settingsStore.enterToSend,
             initialAttachments: initialAttachments
         ) { role, instructions, attachments in
             result = .role(role, instructions, attachments)

@@ -5,6 +5,7 @@ import AppKit
 
 struct RoleSelectionView: View {
     let roles: [Role]
+    let enterToSend: Bool
     let onSelect: (Role, String, [Attachment]) -> Void
     let onFreeQuestion: (String, [Attachment]) -> Void
     let onCancel: () -> Void
@@ -17,12 +18,14 @@ struct RoleSelectionView: View {
 
     init(
         roles: [Role],
+        enterToSend: Bool = false,
         initialAttachments: [Attachment] = [],
         onSelect: @escaping (Role, String, [Attachment]) -> Void,
         onFreeQuestion: @escaping (String, [Attachment]) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.roles = roles
+        self.enterToSend = enterToSend
         self._attachments = State(initialValue: initialAttachments)
         self.onSelect = onSelect
         self.onFreeQuestion = onFreeQuestion
@@ -97,9 +100,26 @@ struct RoleSelectionView: View {
                 TextField("@role 追加指示 / 質問", text: $inputText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .lineLimit(1...3)
+                    .lineLimit(1...5)
                     .focused($isInputFocused)
-                    .onSubmit { handleSubmit() }
+                    .onKeyPress(.return, phases: .down) { event in
+                        let hasControl = event.modifiers.contains(.control)
+                        let hasShift = event.modifiers.contains(.shift)
+
+                        if enterToSend {
+                            // Enter sends, Shift+Enter for newline
+                            if hasShift { return .ignored }
+                            handleSubmit()
+                            return .handled
+                        } else {
+                            // Ctrl+Enter sends, Enter for newline
+                            if hasControl {
+                                handleSubmit()
+                                return .handled
+                            }
+                            return .ignored
+                        }
+                    }
                     .onKeyPress(.delete) {
                         if inputText.isEmpty {
                             if mentionedRole != nil {

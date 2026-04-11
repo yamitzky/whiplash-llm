@@ -15,6 +15,11 @@ final class SettingsStore {
         didSet { save() }
     }
 
+    /// true = Enter sends, Shift+Enter for newline. false (default) = Ctrl+Enter sends, Enter for newline.
+    var enterToSend: Bool {
+        didSet { UserDefaults.standard.set(enterToSend, forKey: "enterToSend") }
+    }
+
     // MARK: - Computed
 
     var defaultModel: ModelConfig? {
@@ -41,6 +46,7 @@ final class SettingsStore {
     // MARK: - Init
 
     init() {
+        self.enterToSend = UserDefaults.standard.bool(forKey: "enterToSend")
         let decoder = JSONDecoder()
 
         // Load connections
