@@ -201,7 +201,6 @@ final class CaptureFlow: NSObject {
 
         let view = RoleSelectionView(
             roles: roleStore.roles,
-            enterToSend: settingsStore.enterToSend,
             initialAttachments: initialAttachments
         ) { role, instructions, attachments in
             result = .role(role, instructions, attachments)
@@ -214,7 +213,6 @@ final class CaptureFlow: NSObject {
         }
 
         let hostingView = NSHostingView(rootView: view)
-        hostingView.frame.size = hostingView.fittingSize
 
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
@@ -236,7 +234,7 @@ final class CaptureFlow: NSObject {
         panel.makeKeyAndOrderFront(nil)
 
         let timer = Timer(timeInterval: 0.05, repeats: false) { _ in
-            panel.contentView?.findFirstTextField().map { panel.makeFirstResponder($0) }
+            panel.contentView?.findFirstEditableTextResponder().map { panel.makeFirstResponder($0) }
         }
         RunLoop.current.add(timer, forMode: .common)
 
@@ -781,10 +779,11 @@ extension CaptureFlow: NSWindowDelegate {
 }
 
 extension NSView {
-    func findFirstTextField() -> NSTextField? {
+    func findFirstEditableTextResponder() -> NSView? {
         if let tf = self as? NSTextField, tf.isEditable { return tf }
+        if let tv = self as? NSTextView, tv.isEditable { return tv }
         for sub in subviews {
-            if let found = sub.findFirstTextField() { return found }
+            if let found = sub.findFirstEditableTextResponder() { return found }
         }
         return nil
     }

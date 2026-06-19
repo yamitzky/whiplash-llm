@@ -5,7 +5,6 @@ import AppKit
 
 struct RoleSelectionView: View {
     let roles: [Role]
-    let enterToSend: Bool
     let onSelect: (Role, String, [Attachment]) -> Void
     let onFreeQuestion: (String, [Attachment]) -> Void
     let onCancel: () -> Void
@@ -18,14 +17,12 @@ struct RoleSelectionView: View {
 
     init(
         roles: [Role],
-        enterToSend: Bool = false,
         initialAttachments: [Attachment] = [],
         onSelect: @escaping (Role, String, [Attachment]) -> Void,
         onFreeQuestion: @escaping (String, [Attachment]) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.roles = roles
-        self.enterToSend = enterToSend
         self._attachments = State(initialValue: initialAttachments)
         self.onSelect = onSelect
         self.onFreeQuestion = onFreeQuestion
@@ -38,7 +35,6 @@ struct RoleSelectionView: View {
         guard let atIdx = inputText.lastIndex(of: "@") else { return nil }
         let afterAt = inputText.index(after: atIdx)
         let rest = inputText[afterAt...]
-        // Only active if @ is not followed by a space (still typing the mention)
         if let spaceIdx = rest.firstIndex(of: " "), spaceIdx < rest.endIndex {
             return nil
         }
@@ -53,17 +49,15 @@ struct RoleSelectionView: View {
 
     private var showingSuggestions: Bool { !suggestions.isEmpty }
 
-    // MARK: - Chips (attachments + mentioned role)
+    // MARK: - Chips
 
     private var hasChips: Bool { !attachments.isEmpty || mentionedRole != nil }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Chips row: attachments + mentioned role
             if hasChips {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        // Mentioned role chip
                         if let role = mentionedRole {
                             RoleChipView(role: role) {
                                 withAnimation(.easeOut(duration: 0.15)) {
@@ -71,7 +65,6 @@ struct RoleSelectionView: View {
                                 }
                             }
                         }
-                        // Attachment chips
                         ForEach(attachments) { attachment in
                             AttachmentChipView(attachment: attachment) {
                                 withAnimation(.easeOut(duration: 0.15)) {
@@ -97,47 +90,45 @@ struct RoleSelectionView: View {
                 .foregroundStyle(.secondary)
                 .help("クリップボードから添付")
 
-                TextField("@role 追加指示 / 質問", text: $inputText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .lineLimit(1...5)
-                    .focused($isInputFocused)
-                    .onKeyPress(.return, phases: .down) { event in
-                        // Suggestion visible: plain Enter picks the suggestion (does NOT send)
-                        if showingSuggestions && event.modifiers.isEmpty {
-                            let index = min(highlightedIndex, suggestions.count - 1)
-                            selectMention(suggestions[index])
-                            return .handled
-                        }
-
-                        let hasControl = event.modifiers.contains(.control)
-                        let hasShift = event.modifiers.contains(.shift)
-
-                        if enterToSend {
-                            if hasShift { return .ignored }
-                            handleSubmit()
-                            return .handled
-                        } else {
-                            if hasControl {
-                                handleSubmit()
+                ZStack(alignment: .topLeading) {
+                    if inputText.isEmpty {
+                        Text("@role 追加指示 / 質問")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 5)
+                            .padding(.top, 8)
+                            .allowsHitTesting(false)
+                    }
+                    TextEditor(text: $inputText)
+                        .font(.system(size: 13))
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 22, maxHeight: 120)
+                        .focused($isInputFocused)
+                        .onKeyPress(keys: [.return], phases: .down) { keyPress in
+                            // Bare Enter with suggestions visible → pick highlighted suggestion
+                            if keyPress.modifiers.isEmpty && showingSuggestions {
+                                let index = min(highlightedIndex, suggestions.count - 1)
+                                guard index >= 0, index < suggestions.count else { return .ignored }
+                                selectMention(suggestions[index])
                                 return .handled
+                            }
+                            // Otherwise let TextEditor insert newline
+                            return .ignored
+                        }
+                        .onKeyPress(.delete) {
+                            if inputText.isEmpty {
+                                if mentionedRole != nil {
+                                    withAnimation(.easeOut(duration: 0.15)) { mentionedRole = nil }
+                                    return .handled
+                                }
+                                if !attachments.isEmpty {
+                                    withAnimation(.easeOut(duration: 0.15)) { attachments.removeLast() }
+                                    return .handled
+                                }
                             }
                             return .ignored
                         }
-                    }
-                    .onKeyPress(.delete) {
-                        if inputText.isEmpty {
-                            if mentionedRole != nil {
-                                withAnimation(.easeOut(duration: 0.15)) { mentionedRole = nil }
-                                return .handled
-                            }
-                            if !attachments.isEmpty {
-                                withAnimation(.easeOut(duration: 0.15)) { attachments.removeLast() }
-                                return .handled
-                            }
-                        }
-                        return .ignored
-                    }
+                }
 
                 Button {
                     handleSubmit()
@@ -148,7 +139,8 @@ struct RoleSelectionView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary)
                 .disabled(!canSubmit)
-                .help("送信")
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("送信 (⌘+Enter)")
             }
             .padding(10)
 
@@ -180,7 +172,6 @@ struct RoleSelectionView: View {
 
             Divider()
 
-            // Role list (always all roles)
             VStack(spacing: 2) {
                 ForEach(roles) { role in
                     RoleRowView(role: role, isSelected: false)
@@ -193,10 +184,17 @@ struct RoleSelectionView: View {
             .padding(6)
         }
         .frame(width: 320)
-        .onAppear { isInputFocused = true }
+        .onAppear {
+            isInputFocused = true
+        }
         .onChange(of: inputText) { _, _ in
             highlightedIndex = 0
+            resizeWindowToFit()
         }
+        .onChange(of: mentionedRole) { _, _ in
+            resizeWindowToFit()
+        }
+        .onChange(of: attachments.count) { _, _ in resizeWindowToFit() }
         .onKeyPress(.leftArrow) {
             guard showingSuggestions else { return .ignored }
             highlightedIndex = max(0, highlightedIndex - 1)
@@ -216,11 +214,27 @@ struct RoleSelectionView: View {
         || mentionedRole != nil
     }
 
+    // MARK: - Window Resize
+
+    private func resizeWindowToFit() {
+        DispatchQueue.main.async {
+            guard let window = NSApp.modalWindow,
+                  let contentView = window.contentView else { return }
+            let fittingSize = contentView.fittingSize
+            let contentRect = window.contentRect(forFrameRect: window.frame)
+            let titleBarHeight = window.frame.height - contentRect.height
+            let newHeight = fittingSize.height + titleBarHeight
+            var frame = window.frame
+            frame.origin.y -= (newHeight - frame.height)
+            frame.size.height = newHeight
+            window.setFrame(frame, display: true)
+        }
+    }
+
     // MARK: - Actions
 
     private func selectMention(_ role: Role) {
         mentionedRole = role
-        // Remove @query from input
         if let mq = mentionQuery {
             let removeStart = mq.atIndex
             let removeEnd = inputText.endIndex
@@ -230,16 +244,8 @@ struct RoleSelectionView: View {
     }
 
     private func handleSubmit() {
-        // If showing @ suggestions, select the highlighted one
-        if showingSuggestions {
-            let index = min(highlightedIndex, suggestions.count - 1)
-            selectMention(suggestions[index])
-            return
-        }
-
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // If a role is mentioned, use it
         if let role = mentionedRole {
             onSelect(role, text, attachments)
             return
@@ -271,7 +277,7 @@ struct RoleSelectionView: View {
     }
 }
 
-// MARK: - Role Chip (for @mentioned role)
+// MARK: - Role Chip
 
 struct RoleChipView: View {
     let role: Role

@@ -26,13 +26,6 @@ struct GeneralTab: View {
                 }
             }
 
-            Section("入力") {
-                Picker("送信方法", selection: $settingsStore.enterToSend) {
-                    Text("Ctrl+Enter で送信（Enterで改行）").tag(false)
-                    Text("Enter で送信（Shift+Enterで改行）").tag(true)
-                }
-            }
-
             Section("起動") {
                 Toggle("ログイン時に起動", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
