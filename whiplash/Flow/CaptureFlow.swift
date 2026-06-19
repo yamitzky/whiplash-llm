@@ -220,6 +220,7 @@ final class CaptureFlow: NSObject {
             backing: .buffered,
             defer: false
         )
+        panel.isReleasedWhenClosed = false
         panel.title = "Whiplash"
         panel.contentView = hostingView
         panel.level = .floating
@@ -272,6 +273,7 @@ final class CaptureFlow: NSObject {
             backing: .buffered,
             defer: false
         )
+        window.isReleasedWhenClosed = false
         window.contentView = hostingView
         window.level = .floating
         window.backgroundColor = .clear
@@ -475,6 +477,7 @@ final class CaptureFlow: NSObject {
             backing: .buffered,
             defer: false
         )
+        panel.isReleasedWhenClosed = false
         panel.title = "\(role.icon) \(role.name)"
         panel.level = .floating
         panel.isFloatingPanel = true
@@ -548,6 +551,7 @@ final class CaptureFlow: NSObject {
             backing: .buffered,
             defer: false
         )
+        panel.isReleasedWhenClosed = false
         panel.title = "⚡ Whiplash"
         panel.level = .floating
         panel.isFloatingPanel = true
@@ -592,6 +596,7 @@ final class CaptureFlow: NSObject {
             backing: .buffered,
             defer: false
         )
+        panel.isReleasedWhenClosed = false
         panel.contentView = hostingView
         panel.level = .floating
         panel.backgroundColor = .clear

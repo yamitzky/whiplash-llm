@@ -112,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
+            window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: view)
             window.title = "Whiplash 設定"
             window.center()
