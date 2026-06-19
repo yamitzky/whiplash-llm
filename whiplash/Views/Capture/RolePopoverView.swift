@@ -13,6 +13,7 @@ struct RoleSelectionView: View {
     @State private var highlightedIndex = 0
     @State private var attachments: [Attachment]
     @State private var mentionedRole: Role?
+    @State private var hostWindow: NSWindow?
     @FocusState private var isInputFocused: Bool
 
     init(
@@ -184,6 +185,7 @@ struct RoleSelectionView: View {
             .padding(6)
         }
         .frame(width: 320)
+        .background(WindowAccessor { hostWindow = $0 })
         .onAppear {
             isInputFocused = true
         }
@@ -218,7 +220,9 @@ struct RoleSelectionView: View {
 
     private func resizeWindowToFit() {
         DispatchQueue.main.async {
-            guard let window = NSApp.modalWindow,
+            // かつては NSApp.modalWindow を使っていたが、runModal 廃止で常に nil になる。
+            // WindowAccessor 経由で掴んだ実ウィンドウを対象にする。
+            guard let window = hostWindow,
                   let contentView = window.contentView else { return }
             let fittingSize = contentView.fittingSize
             let contentRect = window.contentRect(forFrameRect: window.frame)
@@ -264,8 +268,9 @@ struct RoleSelectionView: View {
             return
         }
         if let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) {
-            let tempPath = "/tmp/whiplash-clipboard-\(UUID().uuidString).png"
-            let tempURL = URL(fileURLWithPath: tempPath)
+            // world-readable な /tmp を避け、ユーザー専用の一時ディレクトリへ保存する。
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("whiplash-clipboard-\(UUID().uuidString).png")
             if let imageRep = NSBitmapImageRep(data: imageData),
                let pngData = imageRep.representation(using: .png, properties: [:]) {
                 try? pngData.write(to: tempURL)
@@ -324,6 +329,23 @@ struct AttachmentChipView: View {
         .background(Color.secondary.opacity(0.12))
         .cornerRadius(12)
     }
+}
+
+// MARK: - Window Accessor
+
+/// SwiftUI ビューがホストされている NSWindow を取得するためのブリッジ。
+/// runModal 廃止で NSApp.modalWindow が使えなくなったため、実ウィンドウを直接掴む。
+private struct WindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        // ビューがウィンドウ階層に入るのは生成直後ではないため、次の RunLoop で解決する。
+        DispatchQueue.main.async { onResolve(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 // MARK: - Role Row

@@ -28,6 +28,7 @@ final class CaptureFlow: NSObject {
     private var loadingWindow: NSPanel?
     private var toastWindow: NSPanel?
     private var roleSelectionPanel: NSPanel?
+    private var roleSelectionContinuation: CheckedContinuation<RoleSelectionResult?, Never>?
     private var isCapturing = false
 
     init(roleStore: RoleStore, settingsStore: SettingsStore) {
@@ -57,7 +58,7 @@ final class CaptureFlow: NSObject {
                 return
             }
             let attachment = Attachment(kind: .image(captureResult.imageURL))
-            self.showAndProcess(initialAttachments: [attachment])
+            await self.showAndProcess(initialAttachments: [attachment])
         }
     }
 
@@ -68,52 +69,57 @@ final class CaptureFlow: NSObject {
             return
         }
         isCapturing = true
-        defer { isCapturing = false }
+        Task {
+            defer { isCapturing = false }
 
-        let pasteboard = NSPasteboard.general
-        var initialAttachments: [Attachment] = []
+            let pasteboard = NSPasteboard.general
+            var initialAttachments: [Attachment] = []
 
-        // Try text first (most common)
-        if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            print("[Whiplash] startFromClipboard: found text (\(text.count) chars)")
-            initialAttachments.append(Attachment(kind: .text(text)))
-        }
-        // Try image (TIFF is the standard pasteboard image type on macOS)
-        else if let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) {
-            let tempPath = "/tmp/whiplash-clipboard-\(UUID().uuidString).png"
-            let tempURL = URL(fileURLWithPath: tempPath)
-            do {
-                if let imageRep = NSBitmapImageRep(data: imageData),
-                   let pngData = imageRep.representation(using: .png, properties: [:]) {
-                    try pngData.write(to: tempURL)
-                } else {
-                    try imageData.write(to: tempURL)
-                }
-                print("[Whiplash] startFromClipboard: found image, saved to \(tempPath)")
-                initialAttachments.append(Attachment(kind: .image(tempURL)))
-            } catch {
-                print("[Whiplash] startFromClipboard: failed to save image: \(error)")
-                showError("クリップボード画像の保存に失敗しました")
-                return
+            // Try text first (most common)
+            if let text = pasteboard.string(forType: .string), !text.isEmpty {
+                print("[Whiplash] startFromClipboard: found text (\(text.count) chars)")
+                initialAttachments.append(Attachment(kind: .text(text)))
             }
-        } else {
-            print("[Whiplash] startFromClipboard: clipboard empty, continuing without attachment")
-        }
+            // Try image (TIFF is the standard pasteboard image type on macOS)
+            else if let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) {
+                // world-readable な /tmp を避け、ユーザー専用の一時ディレクトリへ保存する。
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("whiplash-clipboard-\(UUID().uuidString).png")
+                do {
+                    if let imageRep = NSBitmapImageRep(data: imageData),
+                       let pngData = imageRep.representation(using: .png, properties: [:]) {
+                        try pngData.write(to: tempURL)
+                    } else {
+                        try imageData.write(to: tempURL)
+                    }
+                    print("[Whiplash] startFromClipboard: found image, saved to \(tempURL.path)")
+                    initialAttachments.append(Attachment(kind: .image(tempURL)))
+                } catch {
+                    print("[Whiplash] startFromClipboard: failed to save image: \(error)")
+                    showError("クリップボード画像の保存に失敗しました")
+                    return
+                }
+            } else {
+                print("[Whiplash] startFromClipboard: clipboard empty, continuing without attachment")
+            }
 
-        showAndProcess(initialAttachments: initialAttachments)
+            await showAndProcess(initialAttachments: initialAttachments)
+        }
     }
 
     /// Launch with no initial attachment.
     func startEmpty() {
         guard !isCapturing else { return }
         isCapturing = true
-        defer { isCapturing = false }
-        showAndProcess(initialAttachments: [])
+        Task {
+            defer { isCapturing = false }
+            await showAndProcess(initialAttachments: [])
+        }
     }
 
     // MARK: - Unified Flow
 
-    private func showAndProcess(initialAttachments: [Attachment]) {
+    private func showAndProcess(initialAttachments: [Attachment]) async {
         // Start OCR for image attachments eagerly (runs in background while user selects role)
         var ocrTasks: [UUID: Task<OCRResult, Error>] = [:]
         for attachment in initialAttachments {
@@ -125,7 +131,7 @@ final class CaptureFlow: NSObject {
             }
         }
 
-        guard let selection = showRoleSelectionPanel(initialAttachments: initialAttachments) else {
+        guard let selection = await showRoleSelectionPanel(initialAttachments: initialAttachments) else {
             print("[Whiplash] showAndProcess: cancelled")
             for task in ocrTasks.values { task.cancel() }
             cleanupImageAttachments(initialAttachments)
@@ -196,55 +202,80 @@ final class CaptureFlow: NSObject {
 
     // MARK: - Role Selection Panel
 
-    private func showRoleSelectionPanel(initialAttachments: [Attachment]) -> RoleSelectionResult? {
-        var result: RoleSelectionResult?
+    /// ロール選択パネルを「非ブロッキング」で表示し、選択結果を待つ。
+    ///
+    /// かつては `NSApp.runModal(for:)` でアプリモーダルにしていたが、
+    /// モーダルセッション中はメニューや設定（⌘,）が一切操作できなくなるため、
+    /// continuation でコールバックを待つ形に変更した。これによりパネル表示中でも
+    /// メニューバー・設定ウィンドウが通常どおり使える。
+    private func showRoleSelectionPanel(initialAttachments: [Attachment]) async -> RoleSelectionResult? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<RoleSelectionResult?, Never>) in
+            roleSelectionContinuation = continuation
 
-        let view = RoleSelectionView(
-            roles: roleStore.roles,
-            initialAttachments: initialAttachments
-        ) { role, instructions, attachments in
-            result = .role(role, instructions, attachments)
-            NSApp.stopModal()
-        } onFreeQuestion: { question, attachments in
-            result = .freeQuestion(question, attachments)
-            NSApp.stopModal()
-        } onCancel: {
-            NSApp.stopModal()
+            let view = RoleSelectionView(
+                roles: roleStore.roles,
+                initialAttachments: initialAttachments
+            ) { [weak self] role, instructions, attachments in
+                self?.finishRoleSelection(.role(role, instructions, attachments))
+            } onFreeQuestion: { [weak self] question, attachments in
+                self?.finishRoleSelection(.freeQuestion(question, attachments))
+            } onCancel: { [weak self] in
+                self?.finishRoleSelection(nil)
+            }
+
+            let hostingView = NSHostingView(rootView: view)
+
+            let panel = NSPanel(
+                contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
+                styleMask: [.titled, .closable, .utilityWindow],
+                backing: .buffered,
+                defer: false
+            )
+            panel.isReleasedWhenClosed = false
+            panel.title = "Whiplash"
+            panel.contentView = hostingView
+            panel.level = .floating
+            panel.isFloatingPanel = true
+            panel.becomesKeyOnlyIfNeeded = false
+            // 設定ウィンドウ開閉などでアプリが非アクティブ化したときに
+            // ユーティリティパネルが orderOut（windowWillClose 無しで非表示）され、
+            // continuation が resume されず isCapturing が固着するのを防ぐ。
+            panel.hidesOnDeactivate = false
+            panel.delegate = self
+            panel.center()
+
+            roleSelectionPanel = panel
+
+            NSApp.activate()
+            panel.makeKeyAndOrderFront(nil)
+
+            // 初期フォーカスを入力欄へ当てる。NSHostingView の内部ビュー（TextEditor の
+            // 実体）はレイアウト後に生成されるため、明示的にレイアウトさせてから
+            // first responder を設定する（固定ディレイの Timer に頼らない）。
+            // RoleSelectionView 側の @FocusState もバックアップとして併用される。
+            DispatchQueue.main.async {
+                panel.contentView?.layoutSubtreeIfNeeded()
+                if let responder = panel.contentView?.findFirstEditableTextResponder() {
+                    panel.makeFirstResponder(responder)
+                }
+            }
+        }
+    }
+
+    /// ロール選択を確定（または取消）してパネルを閉じ、待機中の continuation を再開する。
+    /// 複数経路（コールバック / ウィンドウのクローズボタン）から呼ばれても
+    /// continuation を一度だけ再開するようガードする。
+    private func finishRoleSelection(_ result: RoleSelectionResult?) {
+        guard let continuation = roleSelectionContinuation else { return }
+        roleSelectionContinuation = nil
+
+        if let panel = roleSelectionPanel {
+            panel.delegate = nil // close() で windowWillClose が再入しないように
+            roleSelectionPanel = nil
+            panel.close()
         }
 
-        let hostingView = NSHostingView(rootView: view)
-
-        let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
-            styleMask: [.titled, .closable, .utilityWindow],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isReleasedWhenClosed = false
-        panel.title = "Whiplash"
-        panel.contentView = hostingView
-        panel.level = .floating
-        panel.isFloatingPanel = true
-        panel.becomesKeyOnlyIfNeeded = false
-        panel.delegate = self
-        panel.center()
-
-        roleSelectionPanel = panel
-
-        NSApp.activate()
-        panel.makeKeyAndOrderFront(nil)
-
-        let timer = Timer(timeInterval: 0.05, repeats: false) { _ in
-            panel.contentView?.findFirstEditableTextResponder().map { panel.makeFirstResponder($0) }
-        }
-        RunLoop.current.add(timer, forMode: .common)
-
-        NSApp.runModal(for: panel)
-
-        roleSelectionPanel = nil
-        panel.close()
-
-        return result
+        continuation.resume(returning: result)
     }
 
     // MARK: - Loading Indicator
@@ -650,8 +681,9 @@ final class CaptureFlow: NSObject {
     func runSelfTest() async {
         print("[TEST] Starting full pipeline self-test...")
 
-        let testPath = "/tmp/whiplash-selftest.png"
-        let testURL = URL(fileURLWithPath: testPath)
+        let testURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("whiplash-selftest.png")
+        let testPath = testURL.path
         defer { try? FileManager.default.removeItem(atPath: testPath) }
 
         let width = 400, height = 200
@@ -745,8 +777,9 @@ final class CaptureFlow: NSObject {
         print("[TEST] Step 11 OK: Stress test passed")
 
         print("[TEST] Step 12: Testing Task.detached capture path...")
-        let capturePath = "/tmp/whiplash-selftest-capture.png"
-        let captureURL = URL(fileURLWithPath: capturePath)
+        let captureURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("whiplash-selftest-capture.png")
+        let capturePath = captureURL.path
         let captureStatus = try? await Task.detached {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
@@ -776,7 +809,8 @@ extension CaptureFlow: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSPanel else { return }
         if window === roleSelectionPanel {
-            NSApp.stopModal()
+            // ユーザーがクローズボタンでパネルを閉じた場合（キャンセル扱い）
+            finishRoleSelection(nil)
         } else if window === richMessageWindow {
             richMessageWindow = nil
         }

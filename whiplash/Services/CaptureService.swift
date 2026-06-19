@@ -17,8 +17,11 @@ enum CaptureError: Error {
 final class CaptureService {
     func capture() async throws -> CaptureResult {
         let id = UUID().uuidString
-        let path = "/tmp/whiplash-capture-\(id).png"
-        let url = URL(fileURLWithPath: path)
+        // 機微なスクリーンショットを world-readable な /tmp ではなく、
+        // ユーザー専用の一時ディレクトリ（mode 0700）に書き出す。
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("whiplash-capture-\(id).png")
+        let path = url.path
 
         // Run screencapture off the main thread to avoid blocking UI
         let status = try await Task.detached {

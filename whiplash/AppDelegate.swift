@@ -10,7 +10,6 @@ extension KeyboardShortcuts.Name {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var settingsWindow: NSWindow?
     let roleStore = RoleStore()
     let settingsStore = SettingsStore()
     lazy var captureFlow = CaptureFlow(
@@ -27,6 +26,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         setupMenuBar()
+
+        // 設定ウィンドウのクローズを直接捕捉してアクティベーションポリシーを戻す
+        // （SwiftUI の .onDisappear に依存しない）。
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(settingsWindowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
 
         KeyboardShortcuts.onKeyDown(for: .newInput) { [weak self] in
             self?.captureFlow.startEmpty()
@@ -103,33 +111,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureFlow.startFromClipboard()
     }
 
+    /// ステータスメニューの「設定を開く...」から SwiftUI の Settings シーンを開く。
+    /// ⌘, は SwiftUI が同じシーンに紐付けるため、入口がここに一本化される。
     @objc private func openSettings() {
-        if settingsWindow == nil {
-            let view = SettingsView(roleStore: roleStore, settingsStore: settingsStore)
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: view)
-            window.title = "Whiplash 設定"
-            window.center()
-            window.delegate = self
-            settingsWindow = window
+        // .regular 化とアクティベートは Settings シーンの onAppear（settingsWindowDidAppear）に
+        // 一本化しているため、ここでは設定シーンを開くだけにする（二重アクティベートの回避）。
+        // macOS 13+ は showSettingsWindow:、それ以前は showPreferencesWindow:。
+        // sendAction は受け手が無いと false を返すので、フォールバックして無反応を防ぐ。
+        if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }
+    }
 
+    /// Settings シーンが表示されたとき（⌘, ・メニュー経由とも）に呼ばれる。
+    func settingsWindowDidAppear() {
         NSApp.setActivationPolicy(.regular)
-        settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-}
 
-extension AppDelegate: NSWindowDelegate {
-    func windowWillClose(_ notification: Notification) {
+    /// 設定ウィンドウが閉じられたらメニューバー常駐（accessory）に戻す。
+    /// SwiftUI の Settings シーンは .onDisappear がクローズ時に発火する保証がないため、
+    /// AppKit の willClose を直接監視する。自前のウィンドウ（ロール選択・rich message・
+    /// ローディング・トースト）はすべて NSPanel なので、素の NSWindow が閉じた＝設定ウィンドウ
+    /// とみなす（accessory 時に来ても冪等なので無害）。
+    @objc private func settingsWindowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, !(closing is NSPanel) else { return }
         NSApp.setActivationPolicy(.accessory)
-        settingsWindow = nil
     }
 }
 
