@@ -114,10 +114,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// ステータスメニューの「設定を開く...」から SwiftUI の Settings シーンを開く。
     /// ⌘, は SwiftUI が同じシーンに紐付けるため、入口がここに一本化される。
     @objc private func openSettings() {
-        // .regular 化とアクティベートは Settings シーンの onAppear（settingsWindowDidAppear）に
-        // 一本化しているため、ここでは設定シーンを開くだけにする（二重アクティベートの回避）。
-        // macOS 13+ は showSettingsWindow:、それ以前は showPreferencesWindow:。
-        // sendAction は受け手が無いと false を返すので、フォールバックして無反応を防ぐ。
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
         if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
             NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }

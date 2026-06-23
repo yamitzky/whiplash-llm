@@ -19,19 +19,24 @@ struct RoleTab: View {
     var body: some View {
         HSplitView {
             VStack(spacing: 0) {
-                List(roleStore.roles, selection: $selectedRoleID) { role in
-                    HStack(spacing: 8) {
-                        Text(role.icon)
-                        Text(role.name)
-                            .lineLimit(1)
-                    }
-                    .contextMenu {
-                        Button("削除", role: .destructive) {
-                            roleStore.delete(role)
-                            if selectedRoleID == role.id {
-                                selectedRoleID = roleStore.roles.first?.id
+                List(selection: $selectedRoleID) {
+                    ForEach(roleStore.roles) { role in
+                        HStack(spacing: 8) {
+                            Text(role.icon)
+                            Text(role.name)
+                                .lineLimit(1)
+                        }
+                        .contextMenu {
+                            Button("削除", role: .destructive) {
+                                roleStore.delete(role)
+                                if selectedRoleID == role.id {
+                                    selectedRoleID = roleStore.roles.first?.id
+                                }
                             }
                         }
+                    }
+                    .onMove { from, to in
+                        roleStore.move(fromOffsets: from, toOffset: to)
                     }
                 }
                 .listStyle(.sidebar)
@@ -73,14 +78,27 @@ struct RoleTab: View {
 struct RoleEditorView: View {
     @Binding var role: Role
     var settingsStore: SettingsStore
+    @FocusState private var iconFieldFocused: Bool
 
     var body: some View {
         Form {
             Section("基本設定") {
                 LabeledContent("アイコン") {
-                    TextField("", text: $role.icon)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 50)
+                    HStack(spacing: 4) {
+                        TextField("", text: $role.icon)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 50)
+                            .focused($iconFieldFocused)
+                        Button {
+                            iconFieldFocused = true
+                            DispatchQueue.main.async {
+                                NSApp.orderFrontCharacterPalette(nil)
+                            }
+                        } label: {
+                            Image(systemName: "face.smiling")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 }
                 LabeledContent("Role名") {
                     TextField("", text: $role.name)

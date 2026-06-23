@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 @Observable
 final class RoleStore {
@@ -42,6 +43,11 @@ final class RoleStore {
 
     func delete(_ role: Role) {
         roles.removeAll { $0.id == role.id }
+        save()
+    }
+
+    func move(fromOffsets: IndexSet, toOffset: Int) {
+        roles.move(fromOffsets: fromOffsets, toOffset: toOffset)
         save()
     }
 

@@ -29,8 +29,6 @@ final class CaptureFlow: NSObject {
     private var toastWindow: NSPanel?
     private var roleSelectionPanel: NSPanel?
     private var roleSelectionContinuation: CheckedContinuation<RoleSelectionResult?, Never>?
-    private var isCapturing = false
-
     init(roleStore: RoleStore, settingsStore: SettingsStore) {
         self.roleStore = roleStore
         self.settingsStore = settingsStore
@@ -41,13 +39,8 @@ final class CaptureFlow: NSObject {
 
     /// Launch with screen capture as initial attachment.
     func start() {
-        guard !isCapturing else {
-            print("[Whiplash] start: already capturing, ignoring")
-            return
-        }
-        isCapturing = true
+        dismissRoleSelectionIfNeeded()
         Task {
-            defer { isCapturing = false }
             print("[Whiplash] start: beginning capture flow")
             let captureResult: CaptureResult
             do {
@@ -64,14 +57,8 @@ final class CaptureFlow: NSObject {
 
     /// Launch with the currently selected text in the frontmost app as initial attachment.
     func startFromSelection() {
-        guard !isCapturing else {
-            print("[Whiplash] startFromSelection: already capturing, ignoring")
-            return
-        }
-        isCapturing = true
+        dismissRoleSelectionIfNeeded()
         Task {
-            defer { isCapturing = false }
-
             let selectedText = await Self.captureSelectedText()
 
             var initialAttachments: [Attachment] = []
@@ -141,11 +128,15 @@ final class CaptureFlow: NSObject {
 
     /// Launch with no initial attachment.
     func startEmpty() {
-        guard !isCapturing else { return }
-        isCapturing = true
+        dismissRoleSelectionIfNeeded()
         Task {
-            defer { isCapturing = false }
             await showAndProcess(initialAttachments: [])
+        }
+    }
+
+    private func dismissRoleSelectionIfNeeded() {
+        if roleSelectionContinuation != nil {
+            finishRoleSelection(nil)
         }
     }
 
