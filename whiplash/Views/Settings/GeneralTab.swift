@@ -20,9 +20,9 @@ struct GeneralTab: View {
                     KeyboardShortcuts.Recorder(for: .capture)
                 }
                 HStack {
-                    Text("クリップボードキャプチャ")
+                    Text("選択テキストキャプチャ")
                     Spacer()
-                    KeyboardShortcuts.Recorder(for: .clipboardCapture)
+                    KeyboardShortcuts.Recorder(for: .selectionCapture)
                 }
             }
 

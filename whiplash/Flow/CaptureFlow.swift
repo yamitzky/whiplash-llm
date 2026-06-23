@@ -62,49 +62,81 @@ final class CaptureFlow: NSObject {
         }
     }
 
-    /// Launch with clipboard content as initial attachment.
-    func startFromClipboard() {
+    /// Launch with the currently selected text in the frontmost app as initial attachment.
+    func startFromSelection() {
         guard !isCapturing else {
-            print("[Whiplash] startFromClipboard: already capturing, ignoring")
+            print("[Whiplash] startFromSelection: already capturing, ignoring")
             return
         }
         isCapturing = true
         Task {
             defer { isCapturing = false }
 
-            let pasteboard = NSPasteboard.general
-            var initialAttachments: [Attachment] = []
+            let selectedText = await Self.captureSelectedText()
 
-            // Try text first (most common)
-            if let text = pasteboard.string(forType: .string), !text.isEmpty {
-                print("[Whiplash] startFromClipboard: found text (\(text.count) chars)")
+            var initialAttachments: [Attachment] = []
+            if let text = selectedText, !text.isEmpty {
+                print("[Whiplash] startFromSelection: found text (\(text.count) chars)")
                 initialAttachments.append(Attachment(kind: .text(text)))
-            }
-            // Try image (TIFF is the standard pasteboard image type on macOS)
-            else if let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) {
-                // world-readable な /tmp を避け、ユーザー専用の一時ディレクトリへ保存する。
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("whiplash-clipboard-\(UUID().uuidString).png")
-                do {
-                    if let imageRep = NSBitmapImageRep(data: imageData),
-                       let pngData = imageRep.representation(using: .png, properties: [:]) {
-                        try pngData.write(to: tempURL)
-                    } else {
-                        try imageData.write(to: tempURL)
-                    }
-                    print("[Whiplash] startFromClipboard: found image, saved to \(tempURL.path)")
-                    initialAttachments.append(Attachment(kind: .image(tempURL)))
-                } catch {
-                    print("[Whiplash] startFromClipboard: failed to save image: \(error)")
-                    showError("クリップボード画像の保存に失敗しました")
-                    return
-                }
             } else {
-                print("[Whiplash] startFromClipboard: clipboard empty, continuing without attachment")
+                print("[Whiplash] startFromSelection: no text selected, continuing without attachment")
             }
 
             await showAndProcess(initialAttachments: initialAttachments)
         }
+    }
+
+    // MARK: - Selected Text Capture
+
+    /// 前面アプリに ⌘C を送って選択テキストを取得し、クリップボードを元に戻す。
+    static func captureSelectedText() async -> String? {
+        let pasteboard = NSPasteboard.general
+
+        // クリップボードの中身を退避
+        let savedItems: [[String: Data]] = pasteboard.pasteboardItems?.map { item in
+            var dict: [String: Data] = [:]
+            for type in item.types {
+                if let data = item.data(forType: type) {
+                    dict[type.rawValue] = data
+                }
+            }
+            return dict
+        } ?? []
+        let savedChangeCount = pasteboard.changeCount
+
+        let source = CGEventSource(stateID: .hidSystemState)
+        let cKeyCode: CGKeyCode = 0x08
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: cKeyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: cKeyCode, keyDown: false) else {
+            print("[Whiplash] captureSelectedText: failed to create CGEvent")
+            return nil
+        }
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
+        keyDown.post(tap: .cgSessionEventTap)
+        keyUp.post(tap: .cgSessionEventTap)
+
+        try? await Task.sleep(for: .milliseconds(100))
+
+        guard pasteboard.changeCount != savedChangeCount else {
+            print("[Whiplash] captureSelectedText: clipboard unchanged (no selection or permission denied)")
+            return nil
+        }
+
+        let text = pasteboard.string(forType: .string)
+        print("[Whiplash] captureSelectedText: got \(text?.count ?? 0) chars")
+
+        // クリップボードを復元
+        pasteboard.clearContents()
+        for itemDict in savedItems {
+            let item = NSPasteboardItem()
+            for (type, data) in itemDict {
+                item.setData(data, forType: NSPasteboard.PasteboardType(type))
+            }
+            pasteboard.writeObjects([item])
+        }
+
+        return text
     }
 
     /// Launch with no initial attachment.

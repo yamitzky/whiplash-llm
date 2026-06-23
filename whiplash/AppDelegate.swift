@@ -5,7 +5,7 @@ import KeyboardShortcuts
 extension KeyboardShortcuts.Name {
     static let newInput = Self("newInput")
     static let capture = Self("capture", default: .init(.x, modifiers: [.command, .shift]))
-    static let clipboardCapture = Self("clipboardCapture", default: .init(.v, modifiers: [.command, .shift]))
+    static let selectionCapture = Self("selectionCapture", default: .init(.v, modifiers: [.command, .shift]))
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Menu items that need shortcut display updates
     private var newInputItem: NSMenuItem!
     private var captureItem: NSMenuItem!
-    private var clipboardItem: NSMenuItem!
+    private var selectionItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -44,8 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.captureFlow.start()
         }
 
-        KeyboardShortcuts.onKeyDown(for: .clipboardCapture) { [weak self] in
-            self?.captureFlow.startFromClipboard()
+        KeyboardShortcuts.onKeyDown(for: .selectionCapture) { [weak self] in
+            self?.captureFlow.startFromSelection()
         }
 
         if ProcessInfo.processInfo.arguments.contains("--self-test") {
@@ -71,8 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureItem = NSMenuItem(title: "キャプチャ", action: #selector(startCapture), keyEquivalent: "")
         menu.addItem(captureItem)
 
-        clipboardItem = NSMenuItem(title: "クリップボードキャプチャ", action: #selector(startClipboardCapture), keyEquivalent: "")
-        menu.addItem(clipboardItem)
+        selectionItem = NSMenuItem(title: "選択テキストキャプチャ", action: #selector(startSelectionCapture), keyEquivalent: "")
+        menu.addItem(selectionItem)
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "設定を開く...", action: #selector(openSettings), keyEquivalent: ","))
@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateMenuShortcutDisplay() {
         applyShortcutDisplay(to: newInputItem, for: .newInput)
         applyShortcutDisplay(to: captureItem, for: .capture)
-        applyShortcutDisplay(to: clipboardItem, for: .clipboardCapture)
+        applyShortcutDisplay(to: selectionItem, for: .selectionCapture)
     }
 
     private func applyShortcutDisplay(to item: NSMenuItem, for name: KeyboardShortcuts.Name) {
@@ -107,8 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureFlow.start()
     }
 
-    @objc private func startClipboardCapture() {
-        captureFlow.startFromClipboard()
+    @objc private func startSelectionCapture() {
+        captureFlow.startFromSelection()
     }
 
     /// ステータスメニューの「設定を開く...」から SwiftUI の Settings シーンを開く。
