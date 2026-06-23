@@ -2,7 +2,7 @@
 
 A macOS menu bar app that lets you query LLMs about whatever's on your screen — without switching apps.
 
-Hit a global shortcut, capture a region (or use clipboard contents), pick a role like "Translate to English" or "Summarize", and get a response in a floating window. That's it.
+Hit a global shortcut, capture a region (or grab selected text from any app), pick a role like "Translate to English" or "Summarize", and get a response in a floating window. That's it.
 
 <img width="772" height="654" alt="Jun-23-2026 17-13-24" src="https://github.com/user-attachments/assets/5303d824-e796-4f24-838c-735dce84bc6f" />
 
@@ -10,10 +10,10 @@ Hit a global shortcut, capture a region (or use clipboard contents), pick a role
 ## What it does
 
 - **Screen capture → OCR → LLM**: Capture any region, the text gets extracted via Apple Vision, and sent to the LLM with your chosen role's system prompt.
-- **Clipboard input**: Same flow, but grabs text/images from your clipboard instead of capturing the screen.
+- **Selected text input**: Select text in any app, hit the shortcut, and the selected text is captured as input. The clipboard is preserved.
 - **Roles**: Preconfigured personas (translator, summarizer, etc.) with customizable system prompts and response behavior. You can add your own.
 - **@mentions**: Type `@translate` in the input field to pick a role inline, shown as a chip above the input.
-- **Attachments**: Captures and clipboard content are treated as removable attachments — add more, remove any, or start with none.
+- **Attachments**: Captures and selected text are treated as removable attachments — add more, remove any, or start with none.
 - **URL fetching**: Drop a URL in the input and it auto-fetches the page content as context.
 - **Follow-up**: Ask follow-up questions in the response window without starting over.
 
@@ -50,7 +50,7 @@ Dependencies:
 | Action | Shortcut |
 |---|---|
 | Screen capture | `Cmd+Shift+X` |
-| Clipboard capture | `Cmd+Shift+V` |
+| Selected text capture | `Cmd+Shift+V` |
 | New input (empty) | Configurable in settings |
 
 All shortcuts are customizable from the settings window.
