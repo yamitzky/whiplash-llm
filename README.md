@@ -4,6 +4,9 @@ A macOS menu bar app that lets you query LLMs about whatever's on your screen �
 
 Hit a global shortcut, capture a region (or use clipboard contents), pick a role like "Translate to English" or "Summarize", and get a response in a floating window. That's it.
 
+<img width="772" height="654" alt="Jun-23-2026 17-13-24" src="https://github.com/user-attachments/assets/5303d824-e796-4f24-838c-735dce84bc6f" />
+
+
 ## What it does
 
 - **Screen capture → OCR → LLM**: Capture any region, the text gets extracted via Apple Vision, and sent to the LLM with your chosen role's system prompt.
