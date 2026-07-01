@@ -6,11 +6,13 @@ struct MainView: View {
     let settingsStore: SettingsStore
     @State private var flow = InputFlow()
     @State private var showSettings = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
             InputView(flow: flow, roleStore: roleStore, settingsStore: settingsStore)
                 .navigationTitle("Whiplash")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showSettings = true } label: {
@@ -30,12 +32,10 @@ struct MainView: View {
                     }
                 }
         }
-        .onAppear {
-            flow.checkForRecentScreenshot()
-        }
-        .onChange(of: flow.sceneIsActive) {
-            if flow.sceneIsActive {
-                flow.checkForRecentScreenshot()
+        .onAppear { flow.pickUpContext() }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                flow.pickUpContext()
             }
         }
     }

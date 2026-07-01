@@ -8,29 +8,36 @@ import Observation
 final class InputFlow {
     var attachments: [Attachment] = []
     var isProcessing = false
-    var sceneIsActive = false
-
     private let ocrService = OCRService()
     private var lastCheckedScreenshotId: String?
 
-    var hasPhotoAccess: Bool {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        return status == .authorized || status == .limited
+    var hasContent: Bool {
+        !attachments.isEmpty
     }
 
-    func requestPhotoAccess() {
-        Task {
-            let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            if status == .authorized || status == .limited {
-                checkForRecentScreenshot()
-            }
+    func pickUpContext() {
+        pickUpRecentScreenshot()
+    }
+
+    func pasteFromClipboard() {
+        if let text = UIPasteboard.general.string, !text.isEmpty {
+            addTextAttachment(text)
         }
     }
 
-    func checkForRecentScreenshot() {
-        sceneIsActive = true
-
-        guard hasPhotoAccess else { return }
+    private func pickUpRecentScreenshot() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else {
+            if status == .notDetermined {
+                Task {
+                    let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+                    if newStatus == .authorized || newStatus == .limited {
+                        pickUpRecentScreenshot()
+                    }
+                }
+            }
+            return
+        }
 
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
@@ -69,7 +76,7 @@ final class InputFlow {
         }
     }
 
-    private func addImageAttachment(_ image: UIImage) {
+    func addImageAttachment(_ image: UIImage) {
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("whiplash-ios-\(UUID().uuidString).png")
         guard let data = image.pngData() else { return }
