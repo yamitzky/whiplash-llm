@@ -9,6 +9,17 @@ public struct LLMResponse: Sendable {
     }
 }
 
+public enum LLMError: Error, LocalizedError {
+    case providerUnavailable(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .providerUnavailable(let name):
+            return "\(name) はこのデバイスでは利用できません。設定から別のモデルを選択してください。"
+        }
+    }
+}
+
 public final class LLMService: Sendable {
     private let settingsStore: SettingsStore
 
@@ -21,7 +32,7 @@ public final class LLMService: Sendable {
         let modelConfig = settingsStore.model(for: role.modelId)
         let prompt = buildPrompt(fullText: fullText, additionalInstructions: additionalInstructions)
         print("[LLM] provider: \(modelConfig?.provider.rawValue ?? "?"), model: \(modelConfig?.modelIdentifier ?? "default")")
-        let session = createSession(instructions: role.systemPrompt, modelConfig: modelConfig)
+        let session = try createSession(instructions: role.systemPrompt, modelConfig: modelConfig)
         let options = buildOptions(modelConfig: modelConfig)
         let response = try await session.respond(to: prompt, options: options)
         return LLMResponse(text: response.content)
@@ -54,7 +65,7 @@ public final class LLMService: Sendable {
         let modelConfig = settingsStore.model(for: modelId)
         let prompt = buildPrompt(fullText: fullText, additionalInstructions: additionalInstructions)
         print("[LLM] streaming: \(modelConfig?.provider.rawValue ?? "?") / \(modelConfig?.modelIdentifier ?? "default")")
-        let session = createSession(instructions: systemPrompt, modelConfig: modelConfig)
+        let session = try createSession(instructions: systemPrompt, modelConfig: modelConfig)
         let options = buildOptions(modelConfig: modelConfig)
 
         let stream = session.streamResponse(to: prompt, options: options)
@@ -121,12 +132,12 @@ public final class LLMService: Sendable {
     }
 
     @MainActor
-    private func createSession(instructions: String, modelConfig: ModelConfig?) -> LanguageModelSession {
+    private func createSession(instructions: String, modelConfig: ModelConfig?) throws -> LanguageModelSession {
         guard let modelConfig else {
             if #available(macOS 26, iOS 26, *) {
                 return LanguageModelSession(model: SystemLanguageModel.default, instructions: instructions)
             }
-            fatalError("Foundation Models requires macOS 26+ or iOS 26+")
+            throw LLMError.providerUnavailable("Apple Foundation Models")
         }
 
         let provider = modelConfig.provider
@@ -139,7 +150,7 @@ public final class LLMService: Sendable {
             if #available(macOS 26, iOS 26, *) {
                 model = SystemLanguageModel.default
             } else {
-                fatalError("Foundation Models requires macOS 26+ or iOS 26+")
+                throw LLMError.providerUnavailable("Apple Foundation Models")
             }
         case .ollama:
             model = OllamaLanguageModel(baseURL: endpoint, model: modelConfig.modelIdentifier)
