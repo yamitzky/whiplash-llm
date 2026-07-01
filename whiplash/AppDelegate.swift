@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import KeyboardShortcuts
+import WhiplashCore
 
 extension KeyboardShortcuts.Name {
     static let newInput = Self("newInput")

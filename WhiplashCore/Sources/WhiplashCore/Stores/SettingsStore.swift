@@ -2,50 +2,51 @@ import Foundation
 import Observation
 
 @Observable
-final class SettingsStore {
-    var connections: [BackendProvider: ProviderConnection] {
+@MainActor
+public final class SettingsStore {
+    public var connections: [BackendProvider: ProviderConnection] {
         didSet { save() }
     }
 
-    var models: [ModelConfig] {
+    public var models: [ModelConfig] {
         didSet { save() }
     }
 
-    var defaultModelId: UUID? {
+    public var defaultModelId: UUID? {
         didSet { save() }
     }
 
     /// true = Enter sends, Shift+Enter for newline. false (default) = Ctrl+Enter sends, Enter for newline.
-    var enterToSend: Bool {
+    public var enterToSend: Bool {
         didSet { UserDefaults.standard.set(enterToSend, forKey: "enterToSend") }
     }
 
     // MARK: - Computed
 
-    var defaultModel: ModelConfig? {
+    public var defaultModel: ModelConfig? {
         models.first(where: { $0.id == defaultModelId }) ?? models.first
     }
 
-    func model(for id: UUID?) -> ModelConfig? {
+    public func model(for id: UUID?) -> ModelConfig? {
         guard let id else { return defaultModel }
         return models.first(where: { $0.id == id }) ?? defaultModel
     }
 
-    func connection(for provider: BackendProvider) -> ProviderConnection {
+    public func connection(for provider: BackendProvider) -> ProviderConnection {
         connections[provider] ?? ProviderConnection()
     }
 
-    func endpoint(for provider: BackendProvider) -> URL {
+    public func endpoint(for provider: BackendProvider) -> URL {
         connections[provider]?.endpoint ?? provider.defaultEndpoint
     }
 
-    func apiKey(for provider: BackendProvider) -> String? {
+    public func apiKey(for provider: BackendProvider) -> String? {
         KeychainService.get("apiKey-\(provider.rawValue)")
     }
 
     // MARK: - Init
 
-    init() {
+    public init() {
         self.enterToSend = UserDefaults.standard.bool(forKey: "enterToSend")
         let decoder = JSONDecoder()
 
@@ -115,7 +116,7 @@ final class SettingsStore {
 
     // MARK: - Mutations
 
-    func setAPIKey(_ key: String?, for provider: BackendProvider) {
+    public func setAPIKey(_ key: String?, for provider: BackendProvider) {
         let account = "apiKey-\(provider.rawValue)"
         if let key, !key.isEmpty {
             KeychainService.set(key, for: account)
@@ -124,20 +125,20 @@ final class SettingsStore {
         }
     }
 
-    func setEndpoint(_ endpoint: URL?, for provider: BackendProvider) {
+    public func setEndpoint(_ endpoint: URL?, for provider: BackendProvider) {
         var conn = connections[provider] ?? ProviderConnection()
         conn.endpoint = endpoint
         connections[provider] = conn
     }
 
-    func addModel(_ model: ModelConfig) {
+    public func addModel(_ model: ModelConfig) {
         models.append(model)
         if models.count == 1 {
             defaultModelId = model.id
         }
     }
 
-    func deleteModel(id: UUID) {
+    public func deleteModel(id: UUID) {
         models.removeAll { $0.id == id }
         if defaultModelId == id {
             defaultModelId = models.first?.id

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Provider
 
-enum BackendProvider: String, Codable, CaseIterable {
+public enum BackendProvider: String, Codable, CaseIterable, Sendable {
     case foundationModels
     case ollama
     case lmStudio
@@ -11,7 +11,7 @@ enum BackendProvider: String, Codable, CaseIterable {
     case gemini
     case openResponses
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .foundationModels: "Apple Foundation Models"
         case .ollama: "Ollama"
@@ -23,14 +23,14 @@ enum BackendProvider: String, Codable, CaseIterable {
         }
     }
 
-    var requiresAPIKey: Bool {
+    public var requiresAPIKey: Bool {
         switch self {
         case .foundationModels, .ollama, .lmStudio: false
         case .openAI, .anthropic, .gemini, .openResponses: true
         }
     }
 
-    var defaultEndpoint: URL {
+    public var defaultEndpoint: URL {
         switch self {
         case .foundationModels: URL(string: "local://foundation-models")!
         case .ollama: URL(string: "http://localhost:11434")!
@@ -45,21 +45,24 @@ enum BackendProvider: String, Codable, CaseIterable {
 
 // MARK: - Provider Connection (per-provider credentials & endpoint)
 
-struct ProviderConnection: Codable, Equatable {
-    var apiKey: String?
-    var endpoint: URL?
-}
+public struct ProviderConnection: Codable, Equatable, Sendable {
+    public var apiKey: String?
+    public var endpoint: URL?
 
-// MARK: - Model Config (self-contained: knows its own provider)
+    public init(apiKey: String? = nil, endpoint: URL? = nil) {
+        self.apiKey = apiKey
+        self.endpoint = endpoint
+    }
+}
 
 // MARK: - Thinking Config
 
-enum ThinkingConfig: Codable, Equatable {
+public enum ThinkingConfig: Codable, Equatable, Sendable {
     case off
     case auto
     case budget(Int)
 
-    var label: String {
+    public var label: String {
         switch self {
         case .off: "オフ"
         case .auto: "自動"
@@ -68,14 +71,16 @@ enum ThinkingConfig: Codable, Equatable {
     }
 }
 
-struct ModelConfig: Codable, Identifiable, Equatable {
-    let id: UUID
-    var name: String
-    var provider: BackendProvider
-    var modelIdentifier: String
-    var thinking: ThinkingConfig
+// MARK: - Model Config (self-contained: knows its own provider)
 
-    init(id: UUID = UUID(), name: String, provider: BackendProvider, modelIdentifier: String, thinking: ThinkingConfig = .off) {
+public struct ModelConfig: Codable, Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public var name: String
+    public var provider: BackendProvider
+    public var modelIdentifier: String
+    public var thinking: ThinkingConfig
+
+    public init(id: UUID = UUID(), name: String, provider: BackendProvider, modelIdentifier: String, thinking: ThinkingConfig = .off) {
         self.id = id
         self.name = name
         self.provider = provider
@@ -83,7 +88,7 @@ struct ModelConfig: Codable, Identifiable, Equatable {
         self.thinking = thinking
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -96,7 +101,7 @@ struct ModelConfig: Codable, Identifiable, Equatable {
         case id, name, provider, modelIdentifier, thinking
     }
 
-    static let builtinDefaults: [ModelConfig] = [
+    public static let builtinDefaults: [ModelConfig] = [
         // Apple
         ModelConfig(name: "Foundation Models", provider: .foundationModels, modelIdentifier: "default"),
         // Anthropic

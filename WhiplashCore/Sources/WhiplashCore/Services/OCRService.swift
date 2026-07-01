@@ -2,11 +2,12 @@ import Vision
 import ImageIO
 import CoreGraphics
 
-final class OCRService {
-    func recognizeText(from imageURL: URL) async throws -> OCRResult {
+public final class OCRService: Sendable {
+    public init() {}
+
+    public func recognizeText(from imageURL: URL) async throws -> OCRResult {
         print("[OCR] Starting with URL: \(imageURL.path)")
 
-        // Load and eagerly decode the image into owned memory
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let srcImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
             print("[OCR] FAIL: Could not load image from file")
@@ -33,7 +34,6 @@ final class OCRService {
         }
         print("[OCR] Decoded CGImage: \(cgImage.width)x\(cgImage.height)")
 
-        // Use VNRecognizeTextRequest (proven, stable API) on a background thread
         print("[OCR] Running VNRecognizeTextRequest...")
         let imageWidth = CGFloat(width)
         let imageHeight = CGFloat(height)

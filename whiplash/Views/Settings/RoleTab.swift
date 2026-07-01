@@ -1,4 +1,5 @@
 import SwiftUI
+import WhiplashCore
 
 struct RoleTab: View {
     @Bindable var roleStore: RoleStore

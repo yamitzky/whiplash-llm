@@ -1,5 +1,5 @@
 {
-  "originHash" : "c925d1530cec88ca91ccc58151a2e81d9fcbb6a9a724c16155ba0f01660118d0",
+  "originHash" : "dd96fb7f46fd73caa9254c0742e01035aa65ee59cdf5fa13db5c1b733bf86f32",
   "pins" : [
     {
       "identity" : "anylanguagemodel",
@@ -56,12 +56,12 @@
       }
     },
     {
-      "identity" : "markdownview?tab=readme-ov-file",
+      "identity" : "markdownview",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/LiYanan2004/MarkdownView?tab=readme-ov-file",
+      "location" : "https://github.com/LiYanan2004/MarkdownView",
       "state" : {
-        "revision" : "31e52d20d68a2459642d1bf33efb3c22be1b3f35",
-        "version" : "2.6.1"
+        "revision" : "232f6f674ecc6bc7f30c256bcf5015054aac6584",
+        "version" : "2.7.0"
       }
     },
     {

@@ -1,18 +1,23 @@
 import Foundation
 import AnyLanguageModel
 
-struct LLMResponse {
-    let text: String
+public struct LLMResponse: Sendable {
+    public let text: String
+
+    public init(text: String) {
+        self.text = text
+    }
 }
 
-final class LLMService {
+public final class LLMService: Sendable {
     private let settingsStore: SettingsStore
 
-    init(settingsStore: SettingsStore) {
+    public init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
     }
 
-    func generateResponse(fullText: String, role: Role, additionalInstructions: String? = nil) async throws -> LLMResponse {
+    @MainActor
+    public func generateResponse(fullText: String, role: Role, additionalInstructions: String? = nil) async throws -> LLMResponse {
         let modelConfig = settingsStore.model(for: role.modelId)
         let prompt = buildPrompt(fullText: fullText, additionalInstructions: additionalInstructions)
         print("[LLM] provider: \(modelConfig?.provider.rawValue ?? "?"), model: \(modelConfig?.modelIdentifier ?? "default")")
@@ -22,7 +27,8 @@ final class LLMService {
         return LLMResponse(text: response.content)
     }
 
-    func generateStreamingResponse(
+    @MainActor
+    public func generateStreamingResponse(
         fullText: String,
         role: Role,
         additionalInstructions: String? = nil,
@@ -37,7 +43,8 @@ final class LLMService {
         )
     }
 
-    func generateStreamingResponse(
+    @MainActor
+    public func generateStreamingResponse(
         fullText: String,
         systemPrompt: String = "",
         modelId: UUID? = nil,
@@ -66,6 +73,7 @@ final class LLMService {
         return "\(fullText)\n\n---\n追加指示: \(instructions)"
     }
 
+    @MainActor
     private func buildOptions(modelConfig: ModelConfig?) -> GenerationOptions {
         var options = GenerationOptions()
         guard let modelConfig, modelConfig.thinking != .off else { return options }
@@ -112,30 +120,39 @@ final class LLMService {
         return options
     }
 
+    @MainActor
     private func createSession(instructions: String, modelConfig: ModelConfig?) -> LanguageModelSession {
         guard let modelConfig else {
-            return LanguageModelSession(model: SystemLanguageModel.default, instructions: instructions)
+            if #available(macOS 26, iOS 26, *) {
+                return LanguageModelSession(model: SystemLanguageModel.default, instructions: instructions)
+            }
+            fatalError("Foundation Models requires macOS 26+ or iOS 26+")
         }
 
         let provider = modelConfig.provider
         let endpoint = settingsStore.endpoint(for: provider)
         let apiKey = settingsStore.apiKey(for: provider) ?? ""
 
-        let model: any LanguageModel = switch provider {
+        let model: any LanguageModel
+        switch provider {
         case .foundationModels:
-            SystemLanguageModel.default
+            if #available(macOS 26, iOS 26, *) {
+                model = SystemLanguageModel.default
+            } else {
+                fatalError("Foundation Models requires macOS 26+ or iOS 26+")
+            }
         case .ollama:
-            OllamaLanguageModel(baseURL: endpoint, model: modelConfig.modelIdentifier)
+            model = OllamaLanguageModel(baseURL: endpoint, model: modelConfig.modelIdentifier)
         case .lmStudio:
-            OpenAILanguageModel(baseURL: endpoint, apiKey: "lm-studio", model: modelConfig.modelIdentifier)
+            model = OpenAILanguageModel(baseURL: endpoint, apiKey: "lm-studio", model: modelConfig.modelIdentifier)
         case .openAI:
-            OpenAILanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = OpenAILanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
         case .anthropic:
-            AnthropicLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = AnthropicLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
         case .gemini:
-            GeminiLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = GeminiLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
         case .openResponses:
-            OpenResponsesLanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = OpenResponsesLanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
         }
         return LanguageModelSession(model: model, instructions: instructions)
     }

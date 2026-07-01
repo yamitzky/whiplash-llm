@@ -1,6 +1,7 @@
 import SwiftUI
 import ServiceManagement
 import KeyboardShortcuts
+import WhiplashCore
 
 struct GeneralTab: View {
     @Bindable var settingsStore: SettingsStore

@@ -1,15 +1,19 @@
 import Foundation
 
-struct Attachment: Identifiable {
-    let id = UUID()
-    let kind: Kind
+public struct Attachment: Identifiable, Sendable {
+    public let id = UUID()
+    public let kind: Kind
 
-    enum Kind {
+    public enum Kind: Sendable {
         case text(String)
         case image(URL)
     }
 
-    var label: String {
+    public init(kind: Kind) {
+        self.kind = kind
+    }
+
+    public var label: String {
         switch kind {
         case .text(let s):
             let preview = String(s.prefix(30))

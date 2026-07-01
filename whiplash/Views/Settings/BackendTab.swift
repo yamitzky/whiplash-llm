@@ -1,4 +1,5 @@
 import SwiftUI
+import WhiplashCore
 
 struct BackendTab: View {
     @Bindable var settingsStore: SettingsStore

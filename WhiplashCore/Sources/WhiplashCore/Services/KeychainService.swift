@@ -1,10 +1,10 @@
 import Foundation
 import Security
 
-enum KeychainService {
+public enum KeychainService: Sendable {
     private static let service = "com.whiplash"
 
-    static func get(_ account: String) -> String? {
+    public static func get(_ account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -19,7 +19,7 @@ enum KeychainService {
         return String(data: data, encoding: .utf8)
     }
 
-    static func set(_ value: String, for account: String) {
+    public static func set(_ value: String, for account: String) {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -35,7 +35,7 @@ enum KeychainService {
         }
     }
 
-    static func delete(_ account: String) {
+    public static func delete(_ account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

@@ -1,4 +1,5 @@
 import SwiftUI
+import WhiplashCore
 
 struct SettingsView: View {
     let roleStore: RoleStore

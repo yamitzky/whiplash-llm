@@ -1,19 +1,19 @@
 import Foundation
 
-enum ResponsePattern: String, Codable, CaseIterable {
+public enum ResponsePattern: String, Codable, CaseIterable, Sendable {
     case richMessage
     case clipboard
 }
 
-struct Role: Codable, Identifiable, Equatable {
-    let id: UUID
-    var name: String
-    var icon: String
-    var systemPrompt: String
-    var responsePatterns: [ResponsePattern]
-    var modelId: UUID?
+public struct Role: Codable, Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public var name: String
+    public var icon: String
+    public var systemPrompt: String
+    public var responsePatterns: [ResponsePattern]
+    public var modelId: UUID?
 
-    init(
+    public init(
         id: UUID = UUID(),
         name: String,
         icon: String,
@@ -29,8 +29,7 @@ struct Role: Codable, Identifiable, Equatable {
         self.modelId = modelId
     }
 
-    // Support decoding from old format that had backendOverride
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)

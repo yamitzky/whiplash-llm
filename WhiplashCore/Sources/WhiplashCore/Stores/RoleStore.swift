@@ -1,16 +1,16 @@
 import Foundation
 import Observation
-import SwiftUI
 
 @Observable
-final class RoleStore {
-    private(set) var roles: [Role] = []
+@MainActor
+public final class RoleStore {
+    public private(set) var roles: [Role] = []
 
-    init() {
+    public init() {
         load()
     }
 
-    func load() {
+    public func load() {
         if let data = UserDefaults.standard.data(forKey: "roles"),
            let decoded = try? JSONDecoder().decode([Role].self, from: data) {
             roles = decoded
@@ -22,7 +22,7 @@ final class RoleStore {
         }
     }
 
-    func save() {
+    public func save() {
         if let data = try? JSONEncoder().encode(roles) {
             UserDefaults.standard.set(data, forKey: "roles")
             UserDefaults.standard.synchronize()
@@ -30,28 +30,28 @@ final class RoleStore {
         }
     }
 
-    func add(_ role: Role) {
+    public func add(_ role: Role) {
         roles.append(role)
         save()
     }
 
-    func update(_ role: Role) {
+    public func update(_ role: Role) {
         guard let index = roles.firstIndex(where: { $0.id == role.id }) else { return }
         roles[index] = role
         save()
     }
 
-    func delete(_ role: Role) {
+    public func delete(_ role: Role) {
         roles.removeAll { $0.id == role.id }
         save()
     }
 
-    func move(fromOffsets: IndexSet, toOffset: Int) {
+    public func move(fromOffsets: IndexSet, toOffset: Int) {
         roles.move(fromOffsets: fromOffsets, toOffset: toOffset)
         save()
     }
 
-    static let presets: [Role] = [
+    public static let presets: [Role] = [
         Role(
             name: "英訳",
             icon: "🌐",

@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import ImageIO
+import WhiplashCore
 
 struct CaptureResult {
     let imageURL: URL

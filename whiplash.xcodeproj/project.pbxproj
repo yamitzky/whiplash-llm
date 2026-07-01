@@ -10,6 +10,7 @@
 		77295E162F84CC9C00758C69 /* MarkdownView in Frameworks */ = {isa = PBXBuildFile; productRef = 77295E152F84CC9C00758C69 /* MarkdownView */; };
 		7765D2F02F82453500BE6284 /* AnyLanguageModel in Frameworks */ = {isa = PBXBuildFile; productRef = 7765D2EF2F82453500BE6284 /* AnyLanguageModel */; };
 		7765D3072F824F1800BE6284 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 7765D3062F824F1800BE6284 /* KeyboardShortcuts */; };
+		77CAFE032FA0000100000003 /* WhiplashCore in Frameworks */ = {isa = PBXBuildFile; productRef = 77CAFE022FA0000100000002 /* WhiplashCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 				7765D2F02F82453500BE6284 /* AnyLanguageModel in Frameworks */,
 				7765D3072F824F1800BE6284 /* KeyboardShortcuts in Frameworks */,
 				77295E162F84CC9C00758C69 /* MarkdownView in Frameworks */,
+				77CAFE032FA0000100000003 /* WhiplashCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +79,7 @@
 				7765D2EF2F82453500BE6284 /* AnyLanguageModel */,
 				7765D3062F824F1800BE6284 /* KeyboardShortcuts */,
 				77295E152F84CC9C00758C69 /* MarkdownView */,
+				77CAFE022FA0000100000002 /* WhiplashCore */,
 			);
 			productName = whiplash;
 			productReference = 7765D2CA2F822A3200BE6284 /* whiplash.app */;
@@ -110,6 +113,7 @@
 				7765D2EE2F82453500BE6284 /* XCRemoteSwiftPackageReference "AnyLanguageModel" */,
 				7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				77295E142F84CC9C00758C69 /* XCRemoteSwiftPackageReference "MarkdownView" */,
+				77CAFE012FA0000100000001 /* XCLocalSwiftPackageReference "WhiplashCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7765D2CB2F822A3200BE6284 /* Products */;
@@ -341,10 +345,17 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		77CAFE012FA0000100000001 /* XCLocalSwiftPackageReference "WhiplashCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = WhiplashCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		77295E142F84CC9C00758C69 /* XCRemoteSwiftPackageReference "MarkdownView" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/LiYanan2004/MarkdownView?tab=readme-ov-file";
+			repositoryURL = "https://github.com/LiYanan2004/MarkdownView";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.6.1;
@@ -383,6 +394,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
 			productName = KeyboardShortcuts;
+		};
+		77CAFE022FA0000100000002 /* WhiplashCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WhiplashCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

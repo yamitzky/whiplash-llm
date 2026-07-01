@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Observation
+import WhiplashCore
 
 @Observable
 @MainActor
@@ -106,8 +107,9 @@ final class CaptureFlow: NSObject {
         try? await Task.sleep(for: .milliseconds(100))
 
         guard pasteboard.changeCount != savedChangeCount else {
-            print("[Whiplash] captureSelectedText: clipboard unchanged (no selection or permission denied)")
-            return nil
+            let fallback = pasteboard.string(forType: .string)
+            print("[Whiplash] captureSelectedText: no selection, falling back to clipboard (\(fallback?.count ?? 0) chars)")
+            return fallback
         }
 
         let text = pasteboard.string(forType: .string)

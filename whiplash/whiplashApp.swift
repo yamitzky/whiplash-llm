@@ -1,4 +1,5 @@
 import SwiftUI
+import WhiplashCore
 
 @main
 struct WhiplashApp: App {
