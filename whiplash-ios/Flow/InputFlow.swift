@@ -42,8 +42,6 @@ final class InputFlow {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = 1
-        options.predicate = NSPredicate(format: "(mediaSubtype & %d) != 0", PHAssetMediaSubtype.photoScreenshot.rawValue)
-
         let result = PHAsset.fetchAssets(with: .image, options: options)
         guard let asset = result.firstObject,
               let creationDate = asset.creationDate,
