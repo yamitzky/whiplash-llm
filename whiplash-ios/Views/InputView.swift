@@ -30,6 +30,20 @@ struct InputView: View {
                 Divider()
             }
 
+            // Photo access prompt
+            if !flow.hasPhotoAccess {
+                Button {
+                    flow.requestPhotoAccess()
+                } label: {
+                    Label("スクショ自動添付を有効にする", systemImage: "photo.on.rectangle")
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+
             // Input area
             VStack(spacing: 12) {
                 TextField("質問やメモを入力（任意）", text: $inputText, axis: .vertical)

@@ -13,21 +13,24 @@ final class InputFlow {
     private let ocrService = OCRService()
     private var lastCheckedScreenshotId: String?
 
+    var hasPhotoAccess: Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
+    func requestPhotoAccess() {
+        Task {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            if status == .authorized || status == .limited {
+                checkForRecentScreenshot()
+            }
+        }
+    }
+
     func checkForRecentScreenshot() {
         sceneIsActive = true
 
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        guard status == .authorized || status == .limited else {
-            if status == .notDetermined {
-                Task {
-                    let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-                    if newStatus == .authorized || newStatus == .limited {
-                        checkForRecentScreenshot()
-                    }
-                }
-            }
-            return
-        }
+        guard hasPhotoAccess else { return }
 
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
