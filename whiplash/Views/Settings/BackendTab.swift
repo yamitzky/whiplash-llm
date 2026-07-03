@@ -199,11 +199,3 @@ private struct AddModelButton: View {
     }
 }
 
-extension BackendProvider {
-    var supportsThinking: Bool {
-        switch self {
-        case .anthropic, .gemini, .openAI, .openResponses: true
-        case .foundationModels, .ollama, .lmStudio: false
-        }
-    }
-}

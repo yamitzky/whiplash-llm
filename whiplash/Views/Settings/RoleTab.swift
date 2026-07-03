@@ -151,18 +151,3 @@ struct RoleEditorView: View {
     }
 }
 
-extension ResponsePattern {
-    var icon: String {
-        switch self {
-        case .richMessage: "💬"
-        case .clipboard: "📋"
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .richMessage: "メッセージボックス"
-        case .clipboard: "クリップボードにコピー"
-        }
-    }
-}
