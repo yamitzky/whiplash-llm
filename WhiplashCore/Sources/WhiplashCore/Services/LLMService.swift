@@ -23,6 +23,16 @@ public enum LLMError: Error, LocalizedError {
 public final class LLMService: Sendable {
     private let settingsStore: SettingsStore
 
+    // 非ストリーミングや thinking 中はサーバーが生成完了まで無通信になるため、
+    // URLSession 既定の 60 秒アイドルタイムアウトでは長い応答が切れる。
+    // リトライは同じ重さで再度タイムアウトし課金も二重になるので採用しなかった。
+    private static let httpSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 600
+        return URLSession(configuration: config)
+    }()
+
     public init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
     }
@@ -153,17 +163,17 @@ public final class LLMService: Sendable {
                 throw LLMError.providerUnavailable("Apple Foundation Models")
             }
         case .ollama:
-            model = OllamaLanguageModel(baseURL: endpoint, model: modelConfig.modelIdentifier)
+            model = OllamaLanguageModel(baseURL: endpoint, model: modelConfig.modelIdentifier, session: Self.httpSession)
         case .lmStudio:
-            model = OpenAILanguageModel(baseURL: endpoint, apiKey: "lm-studio", model: modelConfig.modelIdentifier)
+            model = OpenAILanguageModel(baseURL: endpoint, apiKey: "lm-studio", model: modelConfig.modelIdentifier, session: Self.httpSession)
         case .openAI:
-            model = OpenAILanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = OpenAILanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier, session: Self.httpSession)
         case .anthropic:
-            model = AnthropicLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = AnthropicLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier, session: Self.httpSession)
         case .gemini:
-            model = GeminiLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = GeminiLanguageModel(apiKey: apiKey, model: modelConfig.modelIdentifier, session: Self.httpSession)
         case .openResponses:
-            model = OpenResponsesLanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier)
+            model = OpenResponsesLanguageModel(baseURL: endpoint, apiKey: apiKey, model: modelConfig.modelIdentifier, session: Self.httpSession)
         }
         return LanguageModelSession(model: model, instructions: instructions)
     }
