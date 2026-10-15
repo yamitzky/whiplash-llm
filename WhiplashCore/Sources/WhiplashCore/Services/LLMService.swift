@@ -38,12 +38,17 @@ public final class LLMService: Sendable {
     }
 
     @MainActor
-    public func generateResponse(fullText: String, role: Role, additionalInstructions: String? = nil) async throws -> LLMResponse {
+    public func generateResponse(fullText: String, role: Role, additionalInstructions: String? = nil, imageData: [(Data, String)]? = nil) async throws -> LLMResponse {
         let modelConfig = settingsStore.model(for: role.modelId)
         let prompt = buildPrompt(fullText: fullText, additionalInstructions: additionalInstructions)
         print("[LLM] provider: \(modelConfig?.provider.rawValue ?? "?"), model: \(modelConfig?.modelIdentifier ?? "default")")
         let session = try createSession(instructions: role.systemPrompt, modelConfig: modelConfig)
         let options = buildOptions(modelConfig: modelConfig)
+        if let imageData, !imageData.isEmpty {
+            let images = imageData.map { Transcript.ImageSegment(data: $0.0, mimeType: $0.1) }
+            let response = try await session.respond(to: prompt, images: images, options: options)
+            return LLMResponse(text: response.content)
+        }
         let response = try await session.respond(to: prompt, options: options)
         return LLMResponse(text: response.content)
     }
@@ -53,6 +58,7 @@ public final class LLMService: Sendable {
         fullText: String,
         role: Role,
         additionalInstructions: String? = nil,
+        imageData: [(Data, String)]? = nil,
         onPartialResponse: @Sendable @escaping (String) async -> Void
     ) async throws -> LLMResponse {
         try await generateStreamingResponse(
@@ -60,6 +66,7 @@ public final class LLMService: Sendable {
             systemPrompt: role.systemPrompt,
             modelId: role.modelId,
             additionalInstructions: additionalInstructions,
+            imageData: imageData,
             onPartialResponse: onPartialResponse
         )
     }
@@ -70,6 +77,7 @@ public final class LLMService: Sendable {
         systemPrompt: String = "",
         modelId: UUID? = nil,
         additionalInstructions: String? = nil,
+        imageData: [(Data, String)]? = nil,
         onPartialResponse: @Sendable @escaping (String) async -> Void
     ) async throws -> LLMResponse {
         let modelConfig = settingsStore.model(for: modelId)
@@ -77,6 +85,17 @@ public final class LLMService: Sendable {
         print("[LLM] streaming: \(modelConfig?.provider.rawValue ?? "?") / \(modelConfig?.modelIdentifier ?? "default")")
         let session = try createSession(instructions: systemPrompt, modelConfig: modelConfig)
         let options = buildOptions(modelConfig: modelConfig)
+
+        if let imageData, !imageData.isEmpty {
+            let images = imageData.map { Transcript.ImageSegment(data: $0.0, mimeType: $0.1) }
+            let stream = session.streamResponse(to: prompt, images: images, options: options)
+            var finalText = ""
+            for try await snapshot in stream {
+                finalText = Self.displayText(of: snapshot)
+                await onPartialResponse(finalText)
+            }
+            return LLMResponse(text: finalText)
+        }
 
         let stream = session.streamResponse(to: prompt, options: options)
         var finalText = ""

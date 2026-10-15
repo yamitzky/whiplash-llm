@@ -22,3 +22,12 @@ extension BackendProvider {
         }
     }
 }
+
+extension ImageInputMode {
+    public var label: String {
+        switch self {
+        case .image: "画像をそのまま送信"
+        case .ocr: "テキスト抽出 (OCR)"
+        }
+    }
+}

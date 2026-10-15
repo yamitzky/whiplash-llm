@@ -135,6 +135,14 @@ struct RoleEditorView: View {
                 }
             }
 
+            Section("画像の入力方式") {
+                Picker("方式", selection: $role.imageInputMode) {
+                    ForEach(ImageInputMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+            }
+
             Section("使用モデル") {
                 Picker("モデル", selection: $role.modelId) {
                     Text("デフォルト (\(settingsStore.defaultModel?.name ?? "未設定"))")

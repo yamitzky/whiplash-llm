@@ -5,6 +5,11 @@ public enum ResponsePattern: String, Codable, CaseIterable, Sendable {
     case clipboard
 }
 
+public enum ImageInputMode: String, Codable, CaseIterable, Sendable {
+    case image
+    case ocr
+}
+
 public struct Role: Codable, Identifiable, Equatable, Sendable {
     public let id: UUID
     public var name: String
@@ -12,6 +17,7 @@ public struct Role: Codable, Identifiable, Equatable, Sendable {
     public var systemPrompt: String
     public var responsePatterns: [ResponsePattern]
     public var modelId: UUID?
+    public var imageInputMode: ImageInputMode
 
     public init(
         id: UUID = UUID(),
@@ -19,7 +25,8 @@ public struct Role: Codable, Identifiable, Equatable, Sendable {
         icon: String,
         systemPrompt: String,
         responsePatterns: [ResponsePattern],
-        modelId: UUID? = nil
+        modelId: UUID? = nil,
+        imageInputMode: ImageInputMode = .image
     ) {
         self.id = id
         self.name = name
@@ -27,6 +34,7 @@ public struct Role: Codable, Identifiable, Equatable, Sendable {
         self.systemPrompt = systemPrompt
         self.responsePatterns = responsePatterns
         self.modelId = modelId
+        self.imageInputMode = imageInputMode
     }
 
     public init(from decoder: Decoder) throws {
@@ -37,9 +45,10 @@ public struct Role: Codable, Identifiable, Equatable, Sendable {
         systemPrompt = try container.decode(String.self, forKey: .systemPrompt)
         responsePatterns = try container.decode([ResponsePattern].self, forKey: .responsePatterns)
         modelId = try container.decodeIfPresent(UUID.self, forKey: .modelId)
+        imageInputMode = try container.decodeIfPresent(ImageInputMode.self, forKey: .imageInputMode) ?? .image
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, icon, systemPrompt, responsePatterns, modelId
+        case id, name, icon, systemPrompt, responsePatterns, modelId, imageInputMode
     }
 }

@@ -186,15 +186,27 @@ final class CaptureFlow: NSObject {
         }
 
         Task {
+            // Determine image input mode from role
+            let imageInputMode: ImageInputMode
+            if case .role(let role, _, _) = selection {
+                imageInputMode = role.imageInputMode
+            } else {
+                imageInputMode = .image
+            }
+
             // Combine all attachment content
             var combinedText = ""
+            var imageDataList: [(Data, String)] = []
             for attachment in attachments {
                 switch attachment.kind {
                 case .text(let text):
                     if !combinedText.isEmpty { combinedText += "\n\n" }
                     combinedText += text
-                case .image:
-                    if let task = ocrTasks[attachment.id] {
+                case .image(let url):
+                    if imageInputMode == .image, let data = try? Data(contentsOf: url) {
+                        let mimeType = url.pathExtension == "png" ? "image/png" : "image/jpeg"
+                        imageDataList.append((data, mimeType))
+                    } else if let task = ocrTasks[attachment.id] {
                         do {
                             let ocr = try await task.value
                             if !ocr.fullText.isEmpty {
@@ -214,10 +226,10 @@ final class CaptureFlow: NSObject {
             switch selection {
             case .role(let role, let instructions, _):
                 let enriched = await enrichWithURLContent(instructions)
-                await processWithLLM(role: role, ocrResult: ocrResult, additionalInstructions: enriched)
+                await processWithLLM(role: role, ocrResult: ocrResult, imageData: imageDataList.isEmpty ? nil : imageDataList, additionalInstructions: enriched)
             case .freeQuestion(let question, _):
                 let enriched = await enrichWithURLContent(question)
-                await processFreeQuestion(enriched, ocrResult: ocrResult)
+                await processFreeQuestion(enriched, ocrResult: ocrResult, imageData: imageDataList.isEmpty ? nil : imageDataList)
             }
 
             cleanupImageAttachments(attachments)
@@ -348,7 +360,7 @@ final class CaptureFlow: NSObject {
 
     // MARK: - LLM Processing & Response Dispatch
 
-    private func processWithLLM(role: Role, ocrResult: OCRResult, additionalInstructions: String) async {
+    private func processWithLLM(role: Role, ocrResult: OCRResult, imageData: [(Data, String)]? = nil, additionalInstructions: String) async {
         print("[Whiplash] processWithLLM: starting")
         let hasRichMessage = role.responsePatterns.contains(.richMessage)
 
@@ -364,7 +376,8 @@ final class CaptureFlow: NSObject {
                 let response = try await llmService.generateStreamingResponse(
                     fullText: ocrResult.fullText,
                     role: role,
-                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions
+                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
+                    imageData: imageData
                 ) { @MainActor [weak streamingText] text in
                     streamingText?.text = text
                 }
@@ -382,7 +395,8 @@ final class CaptureFlow: NSObject {
                 let response = try await llmService.generateResponse(
                     fullText: ocrResult.fullText,
                     role: role,
-                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions
+                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
+                    imageData: imageData
                 )
                 dismissLoading()
                 finalText = response.text
@@ -405,7 +419,7 @@ final class CaptureFlow: NSObject {
         print("[Whiplash] processWithLLM: all patterns dispatched")
     }
 
-    private func processFreeQuestion(_ question: String, ocrResult: OCRResult) async {
+    private func processFreeQuestion(_ question: String, ocrResult: OCRResult, imageData: [(Data, String)]? = nil) async {
         print("[Whiplash] processFreeQuestion: starting")
         let streamingText = StreamingText()
         dismissLoading()
@@ -416,7 +430,8 @@ final class CaptureFlow: NSObject {
 
         do {
             let response = try await llmService.generateStreamingResponse(
-                fullText: inputText
+                fullText: inputText,
+                imageData: imageData
             ) { @MainActor [weak streamingText] text in
                 streamingText?.text = text
             }
