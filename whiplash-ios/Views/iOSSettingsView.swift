@@ -76,33 +76,43 @@ struct iOSSettingsView: View {
             // MARK: - Models
             Section {
                 ForEach(settingsStore.models) { model in
-                    HStack {
-                        if model.id == settingsStore.defaultModelId {
-                            Image(systemName: "star.fill")
-                                .foregroundStyle(.yellow)
-                                .font(.caption)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.name)
-                                .font(.body)
-                            HStack(spacing: 4) {
-                                Text(model.provider.displayName)
-                                if model.thinking != .off {
-                                    Text("(\(model.thinking.label))")
-                                        .foregroundStyle(.orange)
+                    NavigationLink {
+                        ModelEditorView(model: Binding(
+                            get: { settingsStore.models.first(where: { $0.id == model.id }) ?? model },
+                            set: { settingsStore.updateModel($0) }
+                        ), settingsStore: settingsStore)
+                    } label: {
+                        HStack {
+                            if model.id == settingsStore.defaultModelId {
+                                Image(systemName: "star.fill")
+                                    .foregroundStyle(.yellow)
+                                    .font(.caption)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(model.name)
+                                    .font(.body)
+                                HStack(spacing: 4) {
+                                    Text(model.provider.displayName)
+                                    if model.thinking != .off {
+                                        Text("(\(model.thinking.label))")
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if model.id != settingsStore.defaultModelId {
-                            Button("デフォルト") {
-                                settingsStore.defaultModelId = model.id
+                            Spacer()
+                            if model.id != settingsStore.defaultModelId {
+                                Button("デフォルト") {
+                                    settingsStore.defaultModelId = model.id
+                                }
+                                .font(.caption)
                             }
-                            .font(.caption)
                         }
                     }
+                }
+                .onMove { from, to in
+                    settingsStore.moveModel(fromOffsets: from, toOffset: to)
                 }
                 .onDelete { indexSet in
                     for i in indexSet {
@@ -186,6 +196,14 @@ private struct RoleEditorView: View {
                 }
             }
 
+            Section("画像の入力方式") {
+                Picker("方式", selection: $role.imageInputMode) {
+                    ForEach(ImageInputMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+            }
+
             Section("使用モデル") {
                 Picker("モデル", selection: $role.modelId) {
                     Text("デフォルト (\(settingsStore.defaultModel?.name ?? "未設定"))")
@@ -261,6 +279,101 @@ private struct ProviderSettingView: View {
     }
 }
 
+// MARK: - Model Editor
+
+private enum ThinkingMode: String, CaseIterable {
+    case off = "オフ"
+    case auto = "自動"
+    case budget = "Budget指定"
+
+    init(from config: ThinkingConfig) {
+        switch config {
+        case .off: self = .off
+        case .auto: self = .auto
+        case .budget: self = .budget
+        }
+    }
+
+    func toConfig(budget: String) -> ThinkingConfig {
+        switch self {
+        case .off: .off
+        case .auto: .auto
+        case .budget: .budget(Int(budget) ?? 4096)
+        }
+    }
+}
+
+private struct ModelEditorView: View {
+    @Binding var model: ModelConfig
+    var settingsStore: SettingsStore
+    @State private var thinkingMode: ThinkingMode = .off
+    @State private var budget = "4096"
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("プロバイダー", selection: $model.provider) {
+                    ForEach(BackendProvider.allCases, id: \.self) { p in
+                        Text(p.displayName).tag(p)
+                    }
+                }
+                HStack {
+                    Text("表示名")
+                    Spacer()
+                    TextField("", text: $model.name)
+                        .multilineTextAlignment(.trailing)
+                }
+                HStack {
+                    Text("モデルID")
+                    Spacer()
+                    TextField("", text: $model.modelIdentifier)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+            }
+
+            if model.provider.supportsThinking {
+                Section("Thinking") {
+                    Picker("モード", selection: $thinkingMode) {
+                        ForEach(ThinkingMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .onChange(of: thinkingMode) {
+                        model.thinking = thinkingMode.toConfig(budget: budget)
+                    }
+                    if thinkingMode == .budget {
+                        TextField("トークン数", text: $budget)
+                            .keyboardType(.numberPad)
+                            .onChange(of: budget) {
+                                model.thinking = thinkingMode.toConfig(budget: budget)
+                            }
+                    }
+                }
+            }
+
+            Section {
+                if model.id != settingsStore.defaultModelId {
+                    Button("デフォルトに設定") {
+                        settingsStore.defaultModelId = model.id
+                    }
+                } else {
+                    Label("デフォルトモデル", systemImage: "star.fill")
+                        .foregroundStyle(.yellow)
+                }
+            }
+        }
+        .navigationTitle(model.name)
+        .onAppear {
+            thinkingMode = ThinkingMode(from: model.thinking)
+            if case .budget(let n) = model.thinking {
+                budget = String(n)
+            }
+        }
+    }
+}
+
 // MARK: - Add Model
 
 private struct AddModelView: View {
@@ -271,12 +384,6 @@ private struct AddModelView: View {
     @State private var modelId = ""
     @State private var thinkingMode: ThinkingMode = .off
     @State private var budget = "4096"
-
-    enum ThinkingMode: String, CaseIterable {
-        case off = "オフ"
-        case auto = "自動"
-        case budget = "Budget指定"
-    }
 
     var body: some View {
         Form {
@@ -308,16 +415,11 @@ private struct AddModelView: View {
 
             Section {
                 Button("追加") {
-                    let thinking: ThinkingConfig = switch thinkingMode {
-                    case .off: .off
-                    case .auto: .auto
-                    case .budget: .budget(Int(budget) ?? 4096)
-                    }
                     let model = ModelConfig(
                         name: name.isEmpty ? modelId : name,
                         provider: provider,
                         modelIdentifier: modelId,
-                        thinking: thinking
+                        thinking: thinkingMode.toConfig(budget: budget)
                     )
                     settingsStore.addModel(model)
                     dismiss()

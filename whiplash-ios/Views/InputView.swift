@@ -9,14 +9,17 @@ struct InputView: View {
 
     @State private var inputText = ""
     @State private var streamingResult: StreamingResult?
-    @State private var showResult = false
-    @State private var showCamera = false
     @State private var photoSelection: PhotosPickerItem?
+    @State private var followUpText = ""
+
+    private var isShowingResult: Bool { streamingResult != nil }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if flow.hasContent || !inputText.isEmpty {
+                if let result = streamingResult {
+                    resultState(result)
+                } else if flow.hasContent || !inputText.isEmpty {
                     readyState
                 } else {
                     emptyState
@@ -24,15 +27,7 @@ struct InputView: View {
             }
             .padding()
         }
-        .sheet(isPresented: $showResult) {
-            if let result = streamingResult {
-                ResultView(result: result) {
-                    showResult = false
-                    flow.clearAttachments()
-                    inputText = ""
-                }
-            }
-        }
+        .animation(.default, value: isShowingResult)
         .onChange(of: photoSelection) {
             if let item = photoSelection {
                 loadPhoto(item)
@@ -58,6 +53,26 @@ struct InputView: View {
                     .multilineTextAlignment(.center)
             }
 
+            if flow.hasNewClipboard {
+                VStack(spacing: 8) {
+                    Text("新しいコピーがあります")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    PasteButton(payloadType: String.self) { strings in
+                        if let text = strings.first, !text.isEmpty {
+                            flow.addTextAttachment(text)
+                            flow.clipboardConsumed()
+                        }
+                    }
+                    .buttonBorderShape(.roundedRectangle)
+                    .controlSize(.large)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.blue.opacity(0.08))
+                .cornerRadius(12)
+            }
+
             HStack(spacing: 12) {
                 PhotosPicker(selection: $photoSelection, matching: .screenshots) {
                     Label("スクショを選ぶ", systemImage: "photo")
@@ -68,6 +83,7 @@ struct InputView: View {
                 PasteButton(payloadType: String.self) { strings in
                     if let text = strings.first, !text.isEmpty {
                         flow.addTextAttachment(text)
+                        flow.clipboardConsumed()
                     }
                 }
             }
@@ -94,10 +110,8 @@ struct InputView: View {
                 .lineLimit(2...5)
                 .textFieldStyle(.roundedBorder)
 
-            // Role grid — the main action
             roleGrid
 
-            // Add more
             HStack(spacing: 12) {
                 PhotosPicker(selection: $photoSelection, matching: .images) {
                     Label("画像を追加", systemImage: "photo.badge.plus")
@@ -107,6 +121,116 @@ struct InputView: View {
                 .controlSize(.small)
 
                 Spacer()
+            }
+        }
+    }
+
+    // MARK: - Result State (inline, no sheet)
+
+    private func resultState(_ result: StreamingResult) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if result.isStreaming && result.text.isEmpty {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("処理中...")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+            } else if let error = result.error {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+            } else {
+                if let thinking = result.thinkingText, !thinking.isEmpty {
+                    DisclosureGroup("思考過程") {
+                        Text(thinking)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(10)
+                    .background(.fill.quaternary)
+                    .cornerRadius(8)
+                }
+
+                if result.responseText.isEmpty && result.isStreaming {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("思考中...")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(result.responseText)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if result.isStreaming && !result.responseText.isEmpty {
+                    ProgressView()
+                        .padding(.top, 4)
+                }
+            }
+
+            if !result.isStreaming {
+                // Follow-up input
+                HStack(spacing: 8) {
+                    TextField("追加の指示...", text: $followUpText)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { submitFollowUp(previousResponse: result.text) }
+
+                    Button {
+                        submitFollowUp(previousResponse: result.text)
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title3)
+                    }
+                    .disabled(followUpText.isEmpty)
+                }
+
+                // Action buttons
+                HStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = result.text
+                    } label: {
+                        Label("コピー", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(result.text.isEmpty)
+
+                    Button {
+                        if let newResult = flow.regenerate() {
+                            streamingResult = newResult
+                        }
+                    } label: {
+                        Label("再生成", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Spacer()
+
+                    Button {
+                        streamingResult = nil
+                        flow.clearAttachments()
+                        inputText = ""
+                        followUpText = ""
+                    } label: {
+                        Label("新規", systemImage: "plus.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
         }
     }
@@ -194,7 +318,6 @@ struct InputView: View {
                 settingsStore: settingsStore
             )
             streamingResult = result
-            showResult = true
         }
     }
 
@@ -206,7 +329,15 @@ struct InputView: View {
                 settingsStore: settingsStore
             )
             streamingResult = result
-            showResult = true
+        }
+    }
+
+    private func submitFollowUp(previousResponse: String) {
+        let text = followUpText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        followUpText = ""
+        if let newResult = flow.followUp(text, previousResponse: previousResponse) {
+            streamingResult = newResult
         }
     }
 
