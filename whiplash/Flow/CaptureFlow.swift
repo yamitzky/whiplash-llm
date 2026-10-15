@@ -9,6 +9,20 @@ final class StreamingText {
     var text: String = ""
     var isStreaming: Bool = true
     var error: String?
+
+    var thinkingText: String? {
+        guard let start = text.range(of: "<thinking>"),
+              let end = text.range(of: "</thinking>") else { return nil }
+        return String(text[start.upperBound..<end.lowerBound])
+    }
+
+    var responseText: String {
+        guard let end = text.range(of: "</thinking>") else {
+            if text.hasPrefix("<thinking>") { return "" }
+            return text
+        }
+        return text[end.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 enum RoleSelectionResult {

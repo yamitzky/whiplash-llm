@@ -14,7 +14,7 @@ struct RichMessageView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                Group {
+                VStack(alignment: .leading, spacing: 8) {
                     if let error = streamingText.error {
                         Text("エラー: \(error)")
                             .foregroundStyle(.red)
@@ -22,16 +22,38 @@ struct RichMessageView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("応答を生成中...")
+                            Text("思考中...")
                                 .foregroundStyle(.secondary)
                         }
-                    } else if showRawText {
-                        Text(streamingText.text)
-                            .font(.system(size: 13, design: .monospaced))
-                            .textSelection(.enabled)
                     } else {
-                        MarkdownView(streamingText.text)
-                            .textSelection(.enabled)
+                        if let thinking = streamingText.thinkingText, !thinking.isEmpty {
+                            DisclosureGroup("思考過程") {
+                                Text(thinking)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(8)
+                            .background(.quaternary)
+                            .cornerRadius(6)
+                        }
+
+                        if streamingText.responseText.isEmpty && streamingText.isStreaming {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("思考中...")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else if showRawText {
+                            Text(streamingText.responseText)
+                                .font(.system(size: 13, design: .monospaced))
+                                .textSelection(.enabled)
+                        } else {
+                            MarkdownView(streamingText.responseText)
+                                .textSelection(.enabled)
+                        }
                     }
                 }
                 .font(.system(size: 13))
@@ -52,7 +74,7 @@ struct RichMessageView: View {
                         submitFollowUp()
                     }
 
-                if streamingText.isStreaming && !streamingText.text.isEmpty {
+                if streamingText.isStreaming && !streamingText.responseText.isEmpty {
                     ProgressView()
                         .controlSize(.small)
                 }
