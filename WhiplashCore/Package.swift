@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "WhiplashCore", targets: ["WhiplashCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/AnyLanguageModel", from: "0.8.0"),
+        .package(url: "https://github.com/huggingface/AnyLanguageModel", from: "1.0.0"),
     ],
     targets: [
         .target(

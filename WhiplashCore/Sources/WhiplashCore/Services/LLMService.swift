@@ -81,10 +81,28 @@ public final class LLMService: Sendable {
         let stream = session.streamResponse(to: prompt, options: options)
         var finalText = ""
         for try await snapshot in stream {
-            finalText = snapshot.content
+            finalText = Self.displayText(of: snapshot)
             await onPartialResponse(finalText)
         }
         return LLMResponse(text: finalText)
+    }
+
+    /// 思考過程は本文ではなく transcriptEntries の reasoning として届くので、
+    /// UI が切り出している `<thinking>…</thinking>` 形式に組み立て直す。
+    static func displayText(of snapshot: LanguageModelSession.ResponseStream<String>.Snapshot) -> String {
+        displayText(content: snapshot.content, entries: snapshot.transcriptEntries)
+    }
+
+    static func displayText(content: String, entries: some Collection<Transcript.Entry>) -> String {
+        let thinking = entries.compactMap { entry -> String? in
+            guard case .reasoning(let reasoning) = entry else { return nil }
+            return reasoning.segments.compactMap { segment -> String? in
+                guard case .text(let text) = segment else { return nil }
+                return text.content
+            }.joined()
+        }.filter { !$0.isEmpty }.joined(separator: "\n\n")
+        guard !thinking.isEmpty else { return content }
+        return "<thinking>\(thinking)</thinking>\n\n\(content)"
     }
 
     private func buildPrompt(fullText: String, additionalInstructions: String?) -> String {
