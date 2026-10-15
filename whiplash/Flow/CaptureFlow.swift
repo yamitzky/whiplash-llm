@@ -72,6 +72,7 @@ final class CaptureFlow: NSObject {
 
     /// Launch with the currently selected text in the frontmost app as initial attachment.
     func startFromSelection() {
+        guard Self.ensureAccessibilityPermission() else { return }
         dismissRoleSelectionIfNeeded()
         Task {
             let selectedText = await Self.captureSelectedText()
@@ -89,6 +90,26 @@ final class CaptureFlow: NSObject {
     }
 
     // MARK: - Selected Text Capture
+
+    /// アクセシビリティ権限を確認し、なければシステム設定を開くダイアログを表示。
+    /// 権限が付与済みなら true を返す。
+    static func ensureAccessibilityPermission() -> Bool {
+        if AXIsProcessTrusted() { return true }
+
+        let alert = NSAlert()
+        alert.messageText = "アクセシビリティ権限が必要です"
+        alert.informativeText = "選択テキストの取得には、システム設定の「プライバシーとセキュリティ → アクセシビリティ」で Whiplash を許可してください。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "システム設定を開く")
+        alert.addButton(withTitle: "キャンセル")
+
+        NSApp.activate()
+        if alert.runModal() == .alertFirstButtonReturn {
+            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+            NSWorkspace.shared.open(url)
+        }
+        return false
+    }
 
     /// 前面アプリに ⌘C を送って選択テキストを取得し、クリップボードを元に戻す。
     static func captureSelectedText() async -> String? {
