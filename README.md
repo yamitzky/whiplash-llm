@@ -40,6 +40,8 @@ You can register multiple models and assign different ones to different roles.
 
 Open `whiplash.xcodeproj` in Xcode and build. SPM dependencies resolve automatically.
 
+To sign with your own team, copy `Configs/Local.xcconfig.example` to `Configs/Local.xcconfig` and set `DEVELOPMENT_TEAM`. The file is gitignored, so set the team there rather than in Xcode's Signing & Capabilities tab (which would write it into the project file).
+
 Dependencies:
 - [AnyLanguageModel](https://github.com/huggingface/AnyLanguageModel) — multi-backend LLM abstraction
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) — global hotkeys

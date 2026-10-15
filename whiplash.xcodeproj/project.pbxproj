@@ -17,6 +17,7 @@
 /* Begin PBXFileReference section */
 		7765D2CA2F822A3200BE6284 /* whiplash.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = whiplash.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		77CAFE102FA0000200000010 /* whiplash-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "whiplash-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		77CAFE212FA0000300000021 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -60,8 +61,17 @@
 			children = (
 				7765D2CC2F822A3200BE6284 /* whiplash */,
 				77CAFE112FA0000200000011 /* whiplash-ios */,
+				77CAFE222FA0000300000022 /* Configs */,
 				7765D2CB2F822A3200BE6284 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		77CAFE222FA0000300000022 /* Configs */ = {
+			isa = PBXGroup;
+			children = (
+				77CAFE212FA0000300000021 /* Base.xcconfig */,
+			);
+			path = Configs;
 			sourceTree = "<group>";
 		};
 		7765D2CB2F822A3200BE6284 /* Products */ = {
@@ -206,6 +216,7 @@
 /* Begin XCBuildConfiguration section */
 		7765D2D32F822A3300BE6284 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 77CAFE212FA0000300000021 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -269,6 +280,7 @@
 		};
 		7765D2D42F822A3300BE6284 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 77CAFE212FA0000300000021 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

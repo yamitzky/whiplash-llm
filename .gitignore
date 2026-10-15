@@ -135,3 +135,6 @@ fastlane/test_output
 iOSInjectionProject/
 
 
+
+# Per-developer signing settings
+Configs/Local.xcconfig

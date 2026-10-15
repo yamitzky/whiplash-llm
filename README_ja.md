@@ -37,6 +37,8 @@
 
 Xcode で `whiplash.xcodeproj` を開いてビルド。SPMの依存は自動で解決される。
 
+自分のチームで署名するには、`Configs/Local.xcconfig.example` を `Configs/Local.xcconfig` にコピーして `DEVELOPMENT_TEAM` を設定する。このファイルは gitignore 対象。Xcode の Signing & Capabilities で設定するとプロジェクトファイルに書き込まれてしまうので、こちらで設定すること。
+
 依存パッケージ:
 - [AnyLanguageModel](https://github.com/huggingface/AnyLanguageModel) — マルチバックエンドLLM抽象化
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) — グローバルショートカット

@@ -1,0 +1,3 @@
+// 署名チームなど開発者ごとに異なる値は Local.xcconfig（gitignore 対象）に置く。
+// pbxproj に直接書くと各自の Team ID がコミットに混ざるため。
+#include? "Local.xcconfig"
