@@ -138,6 +138,15 @@ public final class SettingsStore {
         }
     }
 
+    public func updateModel(_ model: ModelConfig) {
+        guard let index = models.firstIndex(where: { $0.id == model.id }) else { return }
+        models[index] = model
+    }
+
+    public func moveModel(fromOffsets source: IndexSet, toOffset destination: Int) {
+        models.move(fromOffsets: source, toOffset: destination)
+    }
+
     public func deleteModel(id: UUID) {
         models.removeAll { $0.id == id }
         if defaultModelId == id {

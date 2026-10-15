@@ -58,46 +58,59 @@ struct BackendTab: View {
             // MARK: - Model list (all providers mixed)
             Section("モデル一覧") {
                 ForEach(settingsStore.models) { model in
-                    HStack {
-                        if model.id == settingsStore.defaultModelId {
-                            Image(systemName: "star.fill")
-                                .foregroundStyle(.yellow)
-                                .font(.caption)
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.name)
-                                .fontWeight(.medium)
-                            HStack(spacing: 4) {
-                                Text("\(model.provider.displayName) / \(model.modelIdentifier)")
-                                if model.thinking != .off {
-                                    Text("(\(model.thinking.label))")
-                                        .foregroundStyle(.orange)
-                                }
+                    DisclosureGroup {
+                        MacModelEditorView(
+                            model: Binding(
+                                get: { settingsStore.models.first(where: { $0.id == model.id }) ?? model },
+                                set: { settingsStore.updateModel($0) }
+                            ),
+                            settingsStore: settingsStore
+                        )
+                    } label: {
+                        HStack {
+                            if model.id == settingsStore.defaultModelId {
+                                Image(systemName: "star.fill")
+                                    .foregroundStyle(.yellow)
+                                    .font(.caption)
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
 
-                        Spacer()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(model.name)
+                                    .fontWeight(.medium)
+                                HStack(spacing: 4) {
+                                    Text("\(model.provider.displayName) / \(model.modelIdentifier)")
+                                    if model.thinking != .off {
+                                        Text("(\(model.thinking.label))")
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
 
-                        if model.id != settingsStore.defaultModelId {
-                            Button("デフォルト") {
-                                settingsStore.defaultModelId = model.id
+                            Spacer()
+
+                            if model.id != settingsStore.defaultModelId {
+                                Button("デフォルト") {
+                                    settingsStore.defaultModelId = model.id
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.caption)
+                            }
+
+                            Button {
+                                settingsStore.deleteModel(id: model.id)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
                             }
                             .buttonStyle(.borderless)
-                            .font(.caption)
                         }
-
-                        Button {
-                            settingsStore.deleteModel(id: model.id)
-                        } label: {
-                            Image(systemName: "trash")
-                                .foregroundStyle(.red)
-                        }
-                        .buttonStyle(.borderless)
                     }
                     .padding(.vertical, 2)
+                }
+                .onMove { from, to in
+                    settingsStore.moveModel(fromOffsets: from, toOffset: to)
                 }
 
                 AddModelButton(settingsStore: settingsStore)
@@ -105,6 +118,72 @@ struct BackendTab: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+}
+
+private struct MacModelEditorView: View {
+    @Binding var model: ModelConfig
+    var settingsStore: SettingsStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("表示名") {
+                TextField("", text: $model.name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 250)
+            }
+            LabeledContent("プロバイダー") {
+                Picker("", selection: $model.provider) {
+                    ForEach(BackendProvider.allCases, id: \.self) { p in
+                        Text(p.displayName).tag(p)
+                    }
+                }
+                .frame(width: 250)
+            }
+            LabeledContent("モデルID") {
+                TextField("", text: $model.modelIdentifier)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 250)
+            }
+            if model.provider.supportsThinking {
+                LabeledContent("Thinking") {
+                    HStack {
+                        Picker("", selection: Binding(
+                            get: {
+                                switch model.thinking {
+                                case .off: return "off"
+                                case .auto: return "auto"
+                                case .budget: return "budget"
+                                }
+                            },
+                            set: { value in
+                                switch value {
+                                case "off": model.thinking = .off
+                                case "auto": model.thinking = .auto
+                                case "budget": model.thinking = .budget(4096)
+                                default: break
+                                }
+                            }
+                        )) {
+                            Text("オフ").tag("off")
+                            Text("自動").tag("auto")
+                            Text("Budget指定").tag("budget")
+                        }
+                        .frame(width: 150)
+
+                        if case .budget(let n) = model.thinking {
+                            TextField("トークン数", text: Binding(
+                                get: { String(n) },
+                                set: { model.thinking = .budget(Int($0) ?? n) }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
