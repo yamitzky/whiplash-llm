@@ -13,6 +13,7 @@ Hit a global shortcut, capture a region (or grab selected text from any app), pi
 - **Selected text input**: Select text in any app, hit the shortcut, and the selected text is captured as input. The clipboard is preserved.
 - **Roles**: Preconfigured personas (translator, summarizer, etc.) with customizable system prompts and response behavior. You can add your own.
 - **@mentions**: Type `@translate` in the input field to pick a role inline, shown as a chip above the input.
+- **Overlay on the original text**: After a capture or a text selection, send with the overlay button in the Role panel (⌥⌘Enter, or ⌥-click a Role) and results appear on top of the source paragraphs instead of in a separate window. Paragraphs are read through the Accessibility API, with OCR positions as the fallback. Esc, a click or scrolling closes it.
 - **Attachments**: Captures and selected text are treated as removable attachments — add more, remove any, or start with none.
 - **URL fetching**: Drop a URL in the input and it auto-fetches the page content as context.
 - **Follow-up**: Ask follow-up questions in the response window without starting over.

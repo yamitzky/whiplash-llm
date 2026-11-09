@@ -6,8 +6,10 @@ import WhiplashCore
 
 struct RoleSelectionView: View {
     let roles: [Role]
-    let onSelect: (Role, String, [Attachment]) -> Void
-    let onFreeQuestion: (String, [Attachment]) -> Void
+    /// 範囲キャプチャか選択テキストで起動したときだけ、重ねる先がある。
+    let canOverlay: Bool
+    let onSelect: (Role, String, [Attachment], Bool) -> Void
+    let onFreeQuestion: (String, [Attachment], Bool) -> Void
     let onCancel: () -> Void
 
     @State private var inputText = ""
@@ -20,11 +22,13 @@ struct RoleSelectionView: View {
     init(
         roles: [Role],
         initialAttachments: [Attachment] = [],
-        onSelect: @escaping (Role, String, [Attachment]) -> Void,
-        onFreeQuestion: @escaping (String, [Attachment]) -> Void,
+        canOverlay: Bool = false,
+        onSelect: @escaping (Role, String, [Attachment], Bool) -> Void,
+        onFreeQuestion: @escaping (String, [Attachment], Bool) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.roles = roles
+        self.canOverlay = canOverlay
         self._attachments = State(initialValue: initialAttachments)
         self.onSelect = onSelect
         self.onFreeQuestion = onFreeQuestion
@@ -132,8 +136,22 @@ struct RoleSelectionView: View {
                         }
                 }
 
+                if canOverlay {
+                    Button {
+                        handleSubmit(overlay: true)
+                    } label: {
+                        Image(systemName: "rectangle.on.rectangle")
+                            .font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary)
+                    .disabled(!canSubmit)
+                    .keyboardShortcut(.return, modifiers: [.command, .option])
+                    .help("元の文章に重ねて送信 (⌥⌘+Enter)")
+                }
+
                 Button {
-                    handleSubmit()
+                    handleSubmit(overlay: false)
                 } label: {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 13))
@@ -179,7 +197,9 @@ struct RoleSelectionView: View {
                     RoleRowView(role: role, isSelected: false)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            onSelect(role, inputText, attachments)
+                            // ⌥ を押しながらのクリックだけ重ねる。いつものクリックはボックスのまま。
+                            let overlay = canOverlay && NSEvent.modifierFlags.contains(.option)
+                            onSelect(role, inputText, attachments, overlay)
                         }
                 }
             }
@@ -248,16 +268,16 @@ struct RoleSelectionView: View {
         }
     }
 
-    private func handleSubmit() {
+    private func handleSubmit(overlay: Bool) {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let role = mentionedRole {
-            onSelect(role, text, attachments)
+            onSelect(role, text, attachments, overlay)
             return
         }
 
         guard !text.isEmpty else { return }
-        onFreeQuestion(text, attachments)
+        onFreeQuestion(text, attachments, overlay)
     }
 
     private func addFromClipboard() {
@@ -362,11 +382,10 @@ struct RoleRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(role.name)
                     .font(.system(size: 13, weight: .medium))
-                HStack(spacing: 4) {
-                    ForEach(role.responsePatterns, id: \.self) { pattern in
-                        Text(pattern.icon)
-                            .font(.system(size: 10))
-                    }
+                if role.copiesToClipboard {
+                    Text("📋 自動でコピー")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
                 }
             }
             Spacer()

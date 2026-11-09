@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var selectionItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // ターミナル以外へ出すと print がバッファされ、落ちたときや調査中にログが残らない。
+        setvbuf(stdout, nil, _IOLBF, 0)
         NSApp.setActivationPolicy(.accessory)
 
         setupMenuBar()
@@ -47,6 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         KeyboardShortcuts.onKeyDown(for: .selectionCapture) { [weak self] in
             self?.captureFlow.startFromSelection()
+        }
+
+        if ProcessInfo.processInfo.arguments.contains("--overlay-self-test") {
+            Task { @MainActor in
+                await captureFlow.runOverlaySelfTest()
+            }
         }
 
         if ProcessInfo.processInfo.arguments.contains("--self-test") {

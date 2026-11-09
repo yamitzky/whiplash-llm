@@ -26,8 +26,20 @@ final class StreamingText {
 }
 
 enum RoleSelectionResult {
-    case role(Role, String, [Attachment])
-    case freeQuestion(String, [Attachment])
+    /// overlay は送るときに選ぶ。ロールに結びつけると、同じロールでボックスと使い分けられない。
+    case role(Role, String, [Attachment], overlay: Bool)
+    case freeQuestion(String, [Attachment], overlay: Bool)
+}
+
+/// 結果を重ねる場所の手がかり。ロールが決まるまで読み取りを遅らせるので、起動時点の情報だけを持つ。
+struct OverlayAnchor {
+    enum Source {
+        case range(rect: CGRect, imageSize: CGSize, target: OverlayTargetWindow?)
+        case selection(pid: pid_t, mouse: CGPoint, text: String)
+    }
+
+    let attachmentID: UUID
+    let source: Source
 }
 
 @MainActor
@@ -44,6 +56,14 @@ final class CaptureFlow: NSObject {
     private var toastWindow: NSPanel?
     private var roleSelectionPanel: NSPanel?
     private var roleSelectionContinuation: CheckedContinuation<RoleSelectionResult?, Never>?
+    private let overlayController = OverlayController()
+
+    /// 同時に流す段落数。段落ごとの待ちが積み重なると表で 30 秒近くかかったので、ほぼ全部を同時に流す。
+    /// これ以上はプロバイダーのレート制限に当たりやすい。
+    private static let overlayConcurrency = 12
+    /// これを超える範囲は表やメニューを囲んだ場合で、段落ごとに訳しても読めないのでパネルに回す。
+    private static let overlayMaxBlocks = 60
+
     init(roleStore: RoleStore, settingsStore: SettingsStore) {
         self.roleStore = roleStore
         self.settingsStore = settingsStore
@@ -66,7 +86,18 @@ final class CaptureFlow: NSObject {
                 return
             }
             let attachment = Attachment(kind: .image(captureResult.imageURL))
-            await self.showAndProcess(initialAttachments: [attachment])
+            // ロール選択パネルが前面に出る前に、範囲の下にあるウィンドウを確定しておく。
+            let anchor = captureResult.screenRect.map { rect in
+                OverlayAnchor(
+                    attachmentID: attachment.id,
+                    source: .range(
+                        rect: rect,
+                        imageSize: captureResult.imageSize,
+                        target: OverlayTargetWindow.under(CGPoint(x: rect.midX, y: rect.midY))
+                    )
+                )
+            }
+            await self.showAndProcess(initialAttachments: [attachment], anchor: anchor)
         }
     }
 
@@ -74,18 +105,25 @@ final class CaptureFlow: NSObject {
     func startFromSelection() {
         guard Self.ensureAccessibilityPermission() else { return }
         dismissRoleSelectionIfNeeded()
+        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let mouse = ScreenSpace.globalPoint(fromAppKit: NSEvent.mouseLocation)
         Task {
             let selectedText = await Self.captureSelectedText()
 
             var initialAttachments: [Attachment] = []
+            var anchor: OverlayAnchor?
             if let text = selectedText, !text.isEmpty {
                 print("[Whiplash] startFromSelection: found text (\(text.count) chars)")
-                initialAttachments.append(Attachment(kind: .text(text)))
+                let attachment = Attachment(kind: .text(text))
+                initialAttachments.append(attachment)
+                if let frontmostPID {
+                    anchor = OverlayAnchor(attachmentID: attachment.id, source: .selection(pid: frontmostPID, mouse: mouse, text: text))
+                }
             } else {
                 print("[Whiplash] startFromSelection: no text selected, continuing without attachment")
             }
 
-            await showAndProcess(initialAttachments: initialAttachments)
+            await showAndProcess(initialAttachments: initialAttachments, anchor: anchor)
         }
     }
 
@@ -179,7 +217,7 @@ final class CaptureFlow: NSObject {
 
     // MARK: - Unified Flow
 
-    private func showAndProcess(initialAttachments: [Attachment]) async {
+    private func showAndProcess(initialAttachments: [Attachment], anchor: OverlayAnchor? = nil) async {
         // Start OCR for image attachments eagerly (runs in background while user selects role)
         var ocrTasks: [UUID: Task<OCRResult, Error>] = [:]
         for attachment in initialAttachments {
@@ -191,7 +229,7 @@ final class CaptureFlow: NSObject {
             }
         }
 
-        guard let selection = await showRoleSelectionPanel(initialAttachments: initialAttachments) else {
+        guard let selection = await showRoleSelectionPanel(initialAttachments: initialAttachments, canOverlay: anchor != nil) else {
             print("[Whiplash] showAndProcess: cancelled")
             for task in ocrTasks.values { task.cancel() }
             cleanupImageAttachments(initialAttachments)
@@ -200,8 +238,8 @@ final class CaptureFlow: NSObject {
 
         let attachments: [Attachment]
         switch selection {
-        case .role(_, _, let a): attachments = a
-        case .freeQuestion(_, let a): attachments = a
+        case .role(_, _, let a, _): attachments = a
+        case .freeQuestion(_, let a, _): attachments = a
         }
 
         // Start OCR for any new image attachments added during panel
@@ -213,7 +251,7 @@ final class CaptureFlow: NSObject {
             }
         }
 
-        if case .role(let role, _, _) = selection {
+        if case .role(let role, _, _, _) = selection {
             print("[Whiplash] showAndProcess: role selected: \(role.name)")
             showLoading(role: role)
         } else {
@@ -221,9 +259,32 @@ final class CaptureFlow: NSObject {
         }
 
         Task {
+            let overlayRequested: Bool
+            let overlayRole: Role?
+            let overlayInstructions: String
+            switch selection {
+            case .role(let role, let instructions, _, let overlay):
+                (overlayRequested, overlayRole, overlayInstructions) = (overlay, role, instructions)
+            case .freeQuestion(let question, _, let overlay):
+                (overlayRequested, overlayRole, overlayInstructions) = (overlay, nil, question)
+            }
+            if overlayRequested {
+                print("[Whiplash] showAndProcess: overlay requested, anchor=\(anchor != nil), attachments=\(attachments.count), matches=\(attachments.first?.id == anchor?.attachmentID)")
+            }
+            // 添付を足していたら重ねる先と内容が対応しないので、ボックスに回す。
+            if overlayRequested, let anchor, attachments.count == 1, attachments[0].id == anchor.attachmentID {
+                let enriched = await enrichWithURLContent(overlayInstructions)
+                let handled = await processWithOverlay(role: overlayRole, anchor: anchor, ocrTask: ocrTasks[anchor.attachmentID], additionalInstructions: enriched)
+                if handled {
+                    cleanupImageAttachments(attachments)
+                    return
+                }
+                print("[Whiplash] showAndProcess: overlay unavailable, falling back to rich message")
+            }
+
             // Determine image input mode from role
             let imageInputMode: ImageInputMode
-            if case .role(let role, _, _) = selection {
+            if case .role(let role, _, _, _) = selection {
                 imageInputMode = role.imageInputMode
             } else {
                 imageInputMode = .image
@@ -259,10 +320,10 @@ final class CaptureFlow: NSObject {
             let ocrResult = OCRResult(fullText: combinedText, textBlocks: [])
 
             switch selection {
-            case .role(let role, let instructions, _):
+            case .role(let role, let instructions, _, _):
                 let enriched = await enrichWithURLContent(instructions)
                 await processWithLLM(role: role, ocrResult: ocrResult, imageData: imageDataList.isEmpty ? nil : imageDataList, additionalInstructions: enriched)
-            case .freeQuestion(let question, _):
+            case .freeQuestion(let question, _, _):
                 let enriched = await enrichWithURLContent(question)
                 await processFreeQuestion(enriched, ocrResult: ocrResult, imageData: imageDataList.isEmpty ? nil : imageDataList)
             }
@@ -280,17 +341,18 @@ final class CaptureFlow: NSObject {
     /// モーダルセッション中はメニューや設定（⌘,）が一切操作できなくなるため、
     /// continuation でコールバックを待つ形に変更した。これによりパネル表示中でも
     /// メニューバー・設定ウィンドウが通常どおり使える。
-    private func showRoleSelectionPanel(initialAttachments: [Attachment]) async -> RoleSelectionResult? {
+    private func showRoleSelectionPanel(initialAttachments: [Attachment], canOverlay: Bool) async -> RoleSelectionResult? {
         await withCheckedContinuation { (continuation: CheckedContinuation<RoleSelectionResult?, Never>) in
             roleSelectionContinuation = continuation
 
             let view = RoleSelectionView(
                 roles: roleStore.roles,
-                initialAttachments: initialAttachments
-            ) { [weak self] role, instructions, attachments in
-                self?.finishRoleSelection(.role(role, instructions, attachments))
-            } onFreeQuestion: { [weak self] question, attachments in
-                self?.finishRoleSelection(.freeQuestion(question, attachments))
+                initialAttachments: initialAttachments,
+                canOverlay: canOverlay
+            ) { [weak self] role, instructions, attachments, overlay in
+                self?.finishRoleSelection(.role(role, instructions, attachments, overlay: overlay))
+            } onFreeQuestion: { [weak self] question, attachments, overlay in
+                self?.finishRoleSelection(.freeQuestion(question, attachments, overlay: overlay))
             } onCancel: { [weak self] in
                 self?.finishRoleSelection(nil)
             }
@@ -397,61 +459,137 @@ final class CaptureFlow: NSObject {
 
     private func processWithLLM(role: Role, ocrResult: OCRResult, imageData: [(Data, String)]? = nil, additionalInstructions: String) async {
         print("[Whiplash] processWithLLM: starting")
-        let hasRichMessage = role.responsePatterns.contains(.richMessage)
+        // 結果は常にボックスで見せる。クリップボードだけのロールはトーストで終わり、結果を見失っていた。
+        let streamingText = StreamingText()
+        dismissLoading()
+        showRichMessage(role: role, streamingText: streamingText, ocrResult: ocrResult, additionalInstructions: additionalInstructions)
 
-        let finalText: String
-
-        if hasRichMessage {
-            // Streaming mode: show rich message window and stream text into it
-            let streamingText = StreamingText()
-            dismissLoading()
-            showRichMessage(role: role, streamingText: streamingText, ocrResult: ocrResult, additionalInstructions: additionalInstructions)
-
-            do {
-                let response = try await llmService.generateStreamingResponse(
-                    fullText: ocrResult.fullText,
-                    role: role,
-                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
-                    imageData: imageData
-                ) { @MainActor [weak streamingText] text in
-                    streamingText?.text = text
-                }
-                streamingText.isStreaming = false
-                finalText = response.text
-            } catch {
-                streamingText.isStreaming = false
-                streamingText.error = error.localizedDescription
-                print("[Whiplash] processWithLLM: streaming FAILED: \(error)")
-                return
+        do {
+            _ = try await llmService.generateStreamingResponse(
+                fullText: ocrResult.fullText,
+                role: role,
+                additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
+                imageData: imageData
+            ) { @MainActor [weak streamingText] text in
+                streamingText?.text = text
             }
-        } else {
-            // Non-streaming mode
-            do {
-                let response = try await llmService.generateResponse(
-                    fullText: ocrResult.fullText,
-                    role: role,
-                    additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
-                    imageData: imageData
-                )
-                dismissLoading()
-                finalText = response.text
-            } catch {
-                dismissLoading()
-                showError("LLM処理に失敗しました: \(error.localizedDescription)")
-                return
-            }
+            streamingText.isStreaming = false
+        } catch {
+            streamingText.isStreaming = false
+            streamingText.error = error.localizedDescription
+            print("[Whiplash] processWithLLM: streaming FAILED: \(error)")
+            return
         }
 
-        // Dispatch remaining patterns
-        for pattern in role.responsePatterns {
-            switch pattern {
-            case .richMessage:
-                break // already handled via streaming
-            case .clipboard:
-                copyToClipboard(finalText)
-            }
+        // 思考過程まで貼り付けられても困るので、本文だけをコピーする。
+        if role.copiesToClipboard {
+            copyToClipboard(streamingText.responseText)
         }
         print("[Whiplash] processWithLLM: all patterns dispatched")
+    }
+
+    // MARK: - Overlay
+
+    /// 重ねて表示できたら true。読み取れなければ何も表示せず false を返す。
+    private func processWithOverlay(role: Role?, anchor: OverlayAnchor, ocrTask: Task<OCRResult, Error>?, additionalInstructions: String) async -> Bool {
+        let (blocks, targetPID) = await overlayBlocks(for: anchor, ocrTask: ocrTask)
+        guard !blocks.isEmpty, blocks.count <= Self.overlayMaxBlocks else {
+            print("[Whiplash] processWithOverlay: \(blocks.count) blocks, not overlaying")
+            return false
+        }
+
+        let items = blocks.map { OverlayItem(block: $0, streamingText: StreamingText()) }
+        dismissLoading()
+        let startedAt = Date()
+        print("[Whiplash] processWithOverlay: \(items.count) blocks")
+
+        let work = Task { @MainActor [llmService] in
+            await withTaskGroup(of: Void.self) { group in
+                var pending = items[...]
+                func startNext() {
+                    guard let item = pending.popFirst() else { return }
+                    group.addTask { @MainActor in
+                        let streaming = item.streamingText
+                        do {
+                            _ = try await llmService.generateStreamingResponse(
+                                fullText: item.block.text,
+                                systemPrompt: role?.systemPrompt ?? "",
+                                modelId: role?.modelId,
+                                additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions
+                            ) { @MainActor [weak streaming] text in
+                                streaming?.text = text
+                            }
+                        } catch is CancellationError {
+                            // 利用者が閉じただけなので、エラーとして見せない。
+                        } catch {
+                            streaming.error = error.localizedDescription
+                            print("[Whiplash] processWithOverlay: block FAILED: \(error)")
+                        }
+                        streaming.isStreaming = false
+                    }
+                }
+                for _ in 0..<Self.overlayConcurrency { startNext() }
+                for await _ in group { startNext() }
+            }
+        }
+
+        overlayController.show(items: items, returningFocusTo: targetPID) { work.cancel() }
+        await work.value
+        print("[Whiplash] processWithOverlay: all blocks done in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s")
+
+        if !work.isCancelled, role?.copiesToClipboard == true {
+            copyToClipboard(items.map(\.streamingText.responseText).joined(separator: "\n\n"))
+        }
+        return true
+    }
+
+    private func overlayBlocks(for anchor: OverlayAnchor, ocrTask: Task<OCRResult, Error>?) async -> (blocks: [OverlayBlock], pid: pid_t?) {
+        switch anchor.source {
+        case .selection(let pid, let mouse, let text):
+            let rect = await Task.detached { AXTextReader.selectionRect(pid: pid, mouse: mouse) }.value
+            guard let rect else { return ([], pid) }
+            return ([OverlayBlock(frame: rect, text: text)], pid)
+
+        case .range(let rect, let imageSize, let target):
+            if let target, AXIsProcessTrusted() {
+                let started = Date()
+                let blocks = await Task.detached { AXTextReader.readBlocks(target: target, selection: rect) }.value
+                print("[Whiplash] overlayBlocks: \(NSRunningApplication(processIdentifier: target.pid)?.localizedName ?? "?") AX \(blocks.count) blocks in \(String(format: "%.2f", Date().timeIntervalSince(started)))s")
+                if !blocks.isEmpty { return (blocks, target.pid) }
+            }
+            // AX で読めないアプリや権限なしの場合でも、OCR なら位置が取れる。
+            guard let ocr = try? await ocrTask?.value else { return ([], target?.pid) }
+            return (OverlayBlockBuilder.blocks(fromOCR: ocr.textBlocks, imageSize: imageSize, screenRect: rect), target?.pid)
+        }
+    }
+
+    /// 権限も LLM も使わずに表示だけを確かめる。
+    func runOverlaySelfTest() async {
+        let origin = ScreenSpace.globalPoint(fromAppKit: CGPoint(x: NSScreen.screens[0].frame.minX, y: NSScreen.screens[0].frame.maxY))
+        let frames = [
+            CGRect(x: origin.x + 100, y: origin.y + 100, width: 500, height: 44),
+            CGRect(x: origin.x + 100, y: origin.y + 150, width: 500, height: 22),
+            CGRect(x: origin.x + 100, y: origin.y + 180, width: 500, height: 22),
+        ]
+        let items = frames.enumerated().map { index, frame in
+            OverlayItem(
+                block: OverlayBlock(frame: frame, text: String(repeating: "段落の原文です。", count: index == 0 ? 7 : 3)),
+                streamingText: StreamingText()
+            )
+        }
+        items[0].streamingText.text = "OVERLAY-TEST 元の段落より長い結果は下の段落を押し下げます。" + String(repeating: "長い結果の本文です。", count: 12)
+        items[1].streamingText.error = "エラー表示の確認"
+
+        overlayController.show(items: items, returningFocusTo: nil) {}
+        print("[TEST] overlay shown")
+        try? await Task.sleep(for: .seconds(2))
+        if let path = ProcessInfo.processInfo.environment["WHIPLASH_OVERLAY_SNAPSHOT"] {
+            overlayController.writeSnapshot(to: URL(fileURLWithPath: path))
+        }
+        try? await Task.sleep(for: .seconds(2))
+        overlayController.dismiss()
+        print("[TEST] PASS: overlay self-test")
+        exit(0)
     }
 
     private func processFreeQuestion(_ question: String, ocrResult: OCRResult, imageData: [(Data, String)]? = nil) async {
@@ -529,7 +667,7 @@ final class CaptureFlow: NSObject {
         let view = RichMessageView(
             streamingText: streamingText,
             onCopy: { [weak self] in
-                self?.copyToClipboard(streamingText.text)
+                self?.copyToClipboard(streamingText.responseText)
             },
             onRegenerate: { [weak self] in
                 guard let self else { return }
@@ -606,7 +744,7 @@ final class CaptureFlow: NSObject {
         let view = RichMessageView(
             streamingText: streamingText,
             onCopy: { [weak self] in
-                self?.copyToClipboard(streamingText.text)
+                self?.copyToClipboard(streamingText.responseText)
             },
             onRegenerate: { [weak self] in
                 guard let self else { return }
