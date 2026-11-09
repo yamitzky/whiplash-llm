@@ -202,6 +202,40 @@ final class InputFlow {
         )
     }
 
+    // MARK: - バックグラウンドで途切れた生成のやり直し
+
+    private struct GenerationRequest {
+        var fullText: String
+        var imageData: [(Data, String)]?
+        var role: Role?
+        var additionalInstructions: String
+        var settingsStore: SettingsStore
+    }
+
+    /// 画面に出ている生成。新しい生成を始めるか「新規」で閉じると差し替わり、古い生成はやり直さない。
+    private var currentResult: StreamingResult?
+    private var currentRequest: GenerationRequest?
+    private var currentLeftForeground = false
+    private var currentRetried = false
+    private var retryPending = false
+
+    func sceneDidLeaveForeground() {
+        currentLeftForeground = true
+    }
+
+    func sceneDidBecomeActive() {
+        guard retryPending, let result = currentResult, let request = currentRequest else { return }
+        retryPending = false
+        run(request, into: result, isRetry: true)
+    }
+
+    /// 利用者が結果を閉じた。裏で失敗していても、閉じたものを勝手に作り直さない。
+    func discardResult() {
+        currentResult = nil
+        currentRequest = nil
+        retryPending = false
+    }
+
     private func startStreaming(
         fullText: String,
         imageData: [(Data, String)]? = nil,
@@ -209,38 +243,102 @@ final class InputFlow {
         additionalInstructions: String = "",
         settingsStore: SettingsStore
     ) -> StreamingResult {
-        let llmService = LLMService(settingsStore: settingsStore)
         let result = StreamingResult()
+        run(
+            GenerationRequest(
+                fullText: fullText,
+                imageData: imageData,
+                role: role,
+                additionalInstructions: additionalInstructions,
+                settingsStore: settingsStore
+            ),
+            into: result,
+            isRetry: false
+        )
+        return result
+    }
 
-        Task {
+    /// やり直しは画面に出ている同じ StreamingResult に流し直す。
+    /// 新しい StreamingResult を返す regenerate() の形にしなかったのは、
+    /// やり直しが scenePhase から始まり、表示中の結果を差し替える経路がビューにしかないため。
+    private func run(_ request: GenerationRequest, into result: StreamingResult, isRetry: Bool) {
+        currentResult = result
+        currentRequest = request
+        currentRetried = isRetry
+        currentLeftForeground = UIApplication.shared.applicationState != .active
+        retryPending = false
+
+        result.text = ""
+        result.error = nil
+        result.isStreaming = true
+        result.isRetrying = isRetry
+
+        let llmService = LLMService(settingsStore: request.settingsStore)
+        let background = BackgroundExecution()
+
+        let task = Task {
+            defer { background.end() }
             do {
                 let response: LLMResponse
-                if let role {
+                if let role = request.role {
                     response = try await llmService.generateStreamingResponse(
-                        fullText: fullText,
+                        fullText: request.fullText,
                         role: role,
-                        additionalInstructions: additionalInstructions.isEmpty ? nil : additionalInstructions,
-                        imageData: imageData
+                        additionalInstructions: request.additionalInstructions.isEmpty ? nil : request.additionalInstructions,
+                        imageData: request.imageData
                     ) { @MainActor text in
                         result.text = text
                     }
                 } else {
                     response = try await llmService.generateStreamingResponse(
-                        fullText: fullText,
-                        imageData: imageData
+                        fullText: request.fullText,
+                        imageData: request.imageData
                     ) { @MainActor text in
                         result.text = text
                     }
                 }
                 result.isStreaming = false
                 lastResponseText = response.text
+                if result === currentResult {
+                    copyToClipboardIfNeeded(result, role: request.role)
+                }
             } catch {
-                result.isStreaming = false
-                result.error = error.localizedDescription
+                handleFailure(error, request: request, result: result)
             }
         }
+        // 期限が来たら生成を打ち切る。放っておくと停止中に接続が切れ、戻るまで失敗が分からない。
+        background.onExpire = { task.cancel() }
+    }
 
-        return result
+    private func handleFailure(_ error: Error, request: GenerationRequest, result: StreamingResult) {
+        let inBackground = UIApplication.shared.applicationState != .active
+        let shouldRetry = result === currentResult && InterruptedGeneration.shouldRetry(
+            error: error,
+            leftForegroundDuringGeneration: currentLeftForeground,
+            failedInBackground: inBackground,
+            alreadyRetried: currentRetried
+        )
+        guard shouldRetry else {
+            result.isStreaming = false
+            result.error = error.localizedDescription
+            return
+        }
+        if inBackground {
+            // 裏ではもう通信できないので、戻ってきたときに sceneDidBecomeActive でやり直す。
+            retryPending = true
+            result.isRetrying = true
+        } else {
+            run(request, into: result, isRetry: true)
+        }
+    }
+
+    private func copyToClipboardIfNeeded(_ result: StreamingResult, role: Role?) {
+        guard let role, role.copiesToClipboard else { return }
+        let body = result.responseText
+        guard !body.isEmpty else { return }
+        UIPasteboard.general.string = body
+        // 自分で入れた内容を「新しいコピーがあります」と出さない。
+        lastSeenChangeCount = UIPasteboard.general.changeCount
     }
 
     struct GatheredInput {
@@ -281,6 +379,8 @@ final class StreamingResult {
     var text: String = ""
     var isStreaming: Bool = true
     var error: String?
+    /// 裏に回って途切れた生成を自動でやり直している（または戻るのを待っている）。
+    var isRetrying = false
 
     var thinkingText: String? {
         guard let start = text.range(of: "<thinking>"),
@@ -294,5 +394,27 @@ final class StreamingResult {
             return text
         }
         return text[end.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// 生成中だけ裏での実行時間をもらう。終了・失敗・期限切れのどれが先に来ても返すのは 1 回だけ。
+@MainActor
+private final class BackgroundExecution {
+    var onExpire: (() -> Void)?
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+
+    init() {
+        identifier = UIApplication.shared.beginBackgroundTask(withName: "Whiplash generation") { [self] in
+            MainActor.assumeIsolated {
+                onExpire?()
+                end()
+            }
+        }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
     }
 }

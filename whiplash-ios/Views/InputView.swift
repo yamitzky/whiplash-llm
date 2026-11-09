@@ -129,6 +129,12 @@ struct InputView: View {
 
     private func resultState(_ result: StreamingResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            if result.isRetrying && result.isStreaming {
+                Label("通信が途切れたため、もう一度生成しています", systemImage: "arrow.clockwise")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if result.isStreaming && result.text.isEmpty {
                 VStack(spacing: 12) {
                     ProgressView()
@@ -151,10 +157,7 @@ struct InputView: View {
             } else {
                 if let thinking = result.thinkingText, !thinking.isEmpty {
                     DisclosureGroup("思考過程") {
-                        Text(thinking)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
+                        SelectableText(text: thinking, textStyle: .caption1, color: .secondaryLabel)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(10)
@@ -170,8 +173,7 @@ struct InputView: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text(result.responseText)
-                        .textSelection(.enabled)
+                    SelectableText(text: result.responseText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -222,6 +224,7 @@ struct InputView: View {
 
                     Button {
                         streamingResult = nil
+                        flow.discardResult()
                         flow.clearAttachments()
                         inputText = ""
                         followUpText = ""

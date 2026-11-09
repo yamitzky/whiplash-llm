@@ -36,6 +36,9 @@ struct MainView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 flow.pickUpContext()
+                flow.sceneDidBecomeActive()
+            } else {
+                flow.sceneDidLeaveForeground()
             }
         }
     }
