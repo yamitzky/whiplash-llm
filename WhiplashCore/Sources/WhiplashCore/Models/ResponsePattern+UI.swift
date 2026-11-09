@@ -3,6 +3,7 @@ extension ResponsePattern {
         switch self {
         case .richMessage: "💬"
         case .clipboard: "📋"
+        case .overlay: "🔤"
         }
     }
 
@@ -10,7 +11,14 @@ extension ResponsePattern {
         switch self {
         case .richMessage: "メッセージボックス"
         case .clipboard: "クリップボードにコピー"
+        case .overlay: "元の文章に重ねて表示"
         }
+    }
+
+    /// 重ねるかどうかは送るときに選ぶ。ロールに結びつけると同じロールでボックスと使い分けられない。
+    /// overlay は以前のビルドが保存したデータを読むためだけに残している。
+    public static var selectableCases: [ResponsePattern] {
+        allCases.filter { $0 != .overlay }
     }
 }
 

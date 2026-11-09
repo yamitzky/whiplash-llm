@@ -17,6 +17,13 @@ xcodebuild -project whiplash.xcodeproj -scheme whiplash-ios -configuration Debug
 - **署名チーム (`DEVELOPMENT_TEAM`) を pbxproj に書かない。** 各自の Team ID は gitignore 済みの `Configs/Local.xcconfig` に置く(`Configs/Base.xcconfig` が `#include?` する)。Xcode の Signing & Capabilities で Team を選ぶと pbxproj に書き込まれるので、その差分はコミット前に戻す。
 - 依存パッケージのソースをリポジトリ内に clone / vendoring しない。パッチが必要なら upstream に出すか fork を URL で参照する。
 
+## 保存データの形式を変えるとき
+
+- 同じ bundle ID の古いビルドが同じ UserDefaults を読む。新しい形式を古いビルドが読めるか確かめる。読めないと全ロールがプリセットで上書きされる。
+- `Role` の `responsePatterns` には既存の値しか書かない。新しい値は `additionalResponsePatterns` に書く。
+- 形式を変えたら `RoleStore.schemaVersion` を上げ、移行と原本の保持をテストする。
+- 保存される enum（`ResponsePattern`、`ImageInputMode`、`BackendProvider`、`ThinkingConfig` など）に値を足すと、配布済みの古いビルドはその要素を読めない。`SettingsStore` は読めない要素を原本のまま書き戻すが、古いビルドにはこの仕組みがない。
+
 ## LLM 層 (AnyLanguageModel)
 
 - 全プロバイダーの HTTP は `LLMService.httpSession`(アイドル 300 秒)を通す。既定の 60 秒だと thinking や非ストリーミングの長い生成がタイムアウトする。

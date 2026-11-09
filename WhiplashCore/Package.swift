@@ -17,5 +17,12 @@ let package = Package(
             dependencies: ["AnyLanguageModel"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .testTarget(
+            name: "WhiplashCoreTests",
+            dependencies: ["WhiplashCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // WhiplashCore は SwiftUI の move(fromOffsets:) を使うが、静的リンクのテストでは自動で解決されない。
+            linkerSettings: [.linkedFramework("SwiftUI")]
+        ),
     ]
 )

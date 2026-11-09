@@ -44,3 +44,17 @@ public enum KeychainService: Sendable {
         SecItemDelete(query as CFDictionary)
     }
 }
+
+/// SettingsStore が API キーを置く先。テストで実際の Keychain に触れないよう差し替えられるようにしている。
+public protocol SecretStore {
+    func get(_ account: String) -> String?
+    func set(_ value: String, for account: String)
+    func delete(_ account: String)
+}
+
+public struct KeychainSecretStore: SecretStore {
+    public init() {}
+    public func get(_ account: String) -> String? { KeychainService.get(account) }
+    public func set(_ value: String, for account: String) { KeychainService.set(value, for: account) }
+    public func delete(_ account: String) { KeychainService.delete(account) }
+}

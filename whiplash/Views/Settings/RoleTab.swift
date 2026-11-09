@@ -113,26 +113,8 @@ struct RoleEditorView: View {
                     .frame(minHeight: 120)
             }
 
-            Section("応答パターン") {
-                ForEach(ResponsePattern.allCases, id: \.self) { pattern in
-                    Toggle(isOn: Binding(
-                        get: { role.responsePatterns.contains(pattern) },
-                        set: { enabled in
-                            if enabled {
-                                if !role.responsePatterns.contains(pattern) {
-                                    role.responsePatterns.append(pattern)
-                                }
-                            } else {
-                                role.responsePatterns.removeAll { $0 == pattern }
-                            }
-                        }
-                    )) {
-                        HStack {
-                            Text(pattern.icon)
-                            Text(pattern.label)
-                        }
-                    }
-                }
+            Section("結果") {
+                Toggle("結果を自動でクリップボードにコピー", isOn: $role.copiesToClipboard)
             }
 
             Section("画像の入力方式") {
