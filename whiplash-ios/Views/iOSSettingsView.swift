@@ -174,26 +174,8 @@ private struct RoleEditorView: View {
                     .frame(minHeight: 150)
             }
 
-            Section("応答パターン") {
-                ForEach(ResponsePattern.allCases, id: \.self) { pattern in
-                    Toggle(isOn: Binding(
-                        get: { role.responsePatterns.contains(pattern) },
-                        set: { enabled in
-                            if enabled {
-                                if !role.responsePatterns.contains(pattern) {
-                                    role.responsePatterns.append(pattern)
-                                }
-                            } else {
-                                role.responsePatterns.removeAll { $0 == pattern }
-                            }
-                        }
-                    )) {
-                        HStack {
-                            Text(pattern.icon)
-                            Text(pattern.label)
-                        }
-                    }
-                }
+            Section("結果") {
+                Toggle("結果を自動でクリップボードにコピー", isOn: $role.copiesToClipboard)
             }
 
             Section("画像の入力方式") {
@@ -331,6 +313,15 @@ private struct ModelEditorView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
+                ModelCatalogMenu(
+                    provider: model.provider,
+                    endpoint: settingsStore.endpoint(for: model.provider),
+                    selectedID: model.modelIdentifier
+                ) { picked in
+                    model.name = CatalogModel.displayName(
+                        afterPicking: picked, currentName: model.name, previousIdentifier: model.modelIdentifier)
+                    model.modelIdentifier = picked.id
+                }
             }
 
             if model.provider.supportsThinking {
@@ -397,6 +388,15 @@ private struct AddModelView: View {
                 TextField("モデルID（例: claude-sonnet-4-5-20250929）", text: $modelId)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                ModelCatalogMenu(
+                    provider: provider,
+                    endpoint: settingsStore.endpoint(for: provider),
+                    selectedID: modelId
+                ) { picked in
+                    name = CatalogModel.displayName(
+                        afterPicking: picked, currentName: name, previousIdentifier: modelId)
+                    modelId = picked.id
+                }
             }
 
             if provider.supportsThinking {

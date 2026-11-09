@@ -141,9 +141,21 @@ private struct MacModelEditorView: View {
                 .frame(width: 250)
             }
             LabeledContent("モデルID") {
-                TextField("", text: $model.modelIdentifier)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 250)
+                HStack {
+                    TextField("", text: $model.modelIdentifier)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 250)
+                    ModelCatalogMenu(
+                        provider: model.provider,
+                        endpoint: settingsStore.endpoint(for: model.provider),
+                        selectedID: model.modelIdentifier
+                    ) { picked in
+                        model.name = CatalogModel.displayName(
+                            afterPicking: picked, currentName: model.name, previousIdentifier: model.modelIdentifier)
+                        model.modelIdentifier = picked.id
+                    }
+                    .fixedSize()
+                }
             }
             if model.provider.supportsThinking {
                 LabeledContent("Thinking") {
@@ -216,9 +228,21 @@ private struct AddModelButton: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 300)
 
-                TextField("モデルID", text: $newModelId)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 300)
+                HStack {
+                    TextField("モデルID", text: $newModelId)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 300)
+                    ModelCatalogMenu(
+                        provider: newProvider,
+                        endpoint: settingsStore.endpoint(for: newProvider),
+                        selectedID: newModelId
+                    ) { picked in
+                        newName = CatalogModel.displayName(
+                            afterPicking: picked, currentName: newName, previousIdentifier: newModelId)
+                        newModelId = picked.id
+                    }
+                    .fixedSize()
+                }
 
                 if newProvider.supportsThinking {
                     Picker("Thinking", selection: $newThinking) {
