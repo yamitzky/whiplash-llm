@@ -517,7 +517,7 @@
 			repositoryURL = "https://github.com/huggingface/AnyLanguageModel";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				minimumVersion = 1.4.1;
 			};
 		};
 		7765D3052F824F1800BE6284 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {

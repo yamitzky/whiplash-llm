@@ -28,5 +28,6 @@ xcodebuild -project whiplash.xcodeproj -scheme whiplash-ios -configuration Debug
 
 - 全プロバイダーの HTTP は `LLMService.httpSession`(アイドル 300 秒)を通す。既定の 60 秒だと thinking や非ストリーミングの長い生成がタイムアウトする。
 - thinking は `snapshot.transcriptEntries` の `.reasoning` で届く。`LLMService.displayText` が `<thinking>…</thinking>\n\n本文` に組み立て、macOS の `StreamingText` / iOS の `StreamingResult` がそのタグで分割して表示する。この形式を変えるときは両方を直す。
-- thinking 本文が取れるのは現状 Anthropic のストリーミングのみ。
+- thinking 本文が生成中に届くのは Anthropic のストリーミングだけ。AnyLanguageModel 1.4.1 では、LM Studio など OpenAI 互換サーバーの `reasoning_content` と Ollama の `thinking` も `.reasoning` になるが、本文を受け終えた後の最後のスナップショットでまとめて届く。Gemini と Open Responses の thinking 本文は取れない。
+- Whiplash は Ollama に `think` を送っていない。Ollama の thinking が届くかはモデルとサーバーの既定で決まる。
 - Apple 公式スタックへの移行を見送った経緯: `docs/superpowers/specs/2026-07-04-llm-layer-migration-design.md`
