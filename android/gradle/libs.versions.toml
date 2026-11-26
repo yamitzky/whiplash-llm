@@ -1,0 +1,29 @@
+[versions]
+# kotlin と agp は shared/gradle/libs.versions.toml と同じ値にする。
+# composite build で shared と一緒にビルドするので、版を揃えた組み合わせしか確かめていない。
+kotlin = "2.4.21"
+agp = "9.5.3"
+# 2026.11.01 (Compose 1.13) は compileSdk 37.1 が要る。この Mac の SDK には 37.0 までしか無い。
+compose-bom = "2026.09.00"
+activity-compose = "1.13.0"
+lifecycle = "2.11.1"
+# okhttp 5.5 (shared の Ktor が使う) と androidx.core 1.19 が compileSdk 37 を要る。
+android-compileSdk = "37"
+android-targetSdk = "36"
+android-minSdk = "26"
+
+[libraries]
+whiplash-shared = { module = "com.yamitzky.whiplash:shared" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
