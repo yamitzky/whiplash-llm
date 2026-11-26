@@ -11,8 +11,10 @@ macOS と iOS のアプリにはまだつないでいない。画面は共有し
 | --- | --- | --- |
 | `model` | `Role`、`ModelConfig`、`BackendProvider`、`ThinkingConfig` などの型 | なし |
 | `store` | `RoleStore`、`SettingsStore`、保存形式の読み書き (`StoredJson`)、保存先のインターフェース (`KeyValueStore`、`SecretStore`) | kotlinx-serialization-json (JsonElement だけ) |
-| `llm` | `LlmProvider` インターフェース、`LlmService`、プロンプトの組み立て (`Prompt`) | kotlinx-coroutines |
+| `llm` | `LlmProvider` インターフェース、`LlmService`、プロンプトの組み立て (`Prompt`)、SSE の行の読み分け (`SseDecoder`) | kotlinx-coroutines |
 | `llm.openai` | OpenAI 互換 Chat Completions のストリーミング (`OpenAiChatCompletionsProvider`) | Ktor |
+| `llm.anthropic` | Anthropic Messages API のストリーミング (`AnthropicMessagesProvider`) | Ktor |
+| `llm.gemini` | Gemini API の streamGenerateContent (`GeminiProvider`) | Ktor |
 
 `model`、`store`、`llm` は Ktor を import しない。プロバイダーの実装は `LlmProvider` を実装すればよく、OS ごとに置ける。
 Swift から呼ぶ API は、コールバックと suspend 関数だけで使える形にしている (SKIE を前提にしない)。
