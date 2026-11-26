@@ -1,0 +1,1 @@
+[{"thinking":{"off":{}},"modelIdentifier":"default","name":"Foundation","provider":"foundationModels","id":"36557CE8-0000-4000-8000-000000000101"},{"thinking":{"budget":{"_0":2048}},"modelIdentifier":"claude-x","name":"Claude","provider":"anthropic","id":"36557CE8-0000-4000-8000-000000000102"}]

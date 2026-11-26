@@ -23,6 +23,11 @@ xcodebuild -project whiplash.xcodeproj -scheme whiplash-ios -configuration Debug
 - `Role` の `responsePatterns` には既存の値しか書かない。新しい値は `additionalResponsePatterns` に書く。
 - 形式を変えたら `RoleStore.schemaVersion` を上げ、移行と原本の保持をテストする。
 - 保存される enum（`ResponsePattern`、`ImageInputMode`、`BackendProvider`、`ThinkingConfig` など）に値を足すと、配布済みの古いビルドはその要素を読めない。`SettingsStore` は読めない要素を原本のまま書き戻すが、古いビルドにはこの仕組みがない。
+- Kotlin の共有コア (`shared/`) も同じ形式を読み書きする。形式を変えたら `shared/scripts/export-swift-fixtures.sh` で fixture を書き出し直し、`shared/` のテストを流す。
+
+## 共有コア (shared/)
+
+Android 版のための Kotlin Multiplatform の Gradle プロジェクト。Mac と iOS のアプリにはまだつないでいない。ビルドとテストの手順は `shared/README.md`。JDK 21 と Android SDK が要る。
 
 ## LLM 層 (AnyLanguageModel)
 
