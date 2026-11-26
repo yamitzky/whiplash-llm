@@ -143,3 +143,8 @@ Configs/Local.xcconfig
 .gradle/
 .kotlin/
 local.properties
+
+# Android のリリース署名の鍵とパスワード (android/README.md)
+android/keystore.properties
+*.jks
+*.keystore

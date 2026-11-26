@@ -4,7 +4,8 @@ agp = "9.5.3"
 ktor = "3.6.2"
 coroutines = "1.11.0"
 serialization = "1.13.0"
-android-compileSdk = "36"
+# okhttp 5.5 (Ktor の Android エンジン) が compileSdk 37 以上を要る。
+android-compileSdk = "37"
 android-minSdk = "26"
 
 [libraries]

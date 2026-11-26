@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Whiplash</string>
+    <!-- 文字選択メニューに出る名前 -->
+    <string name="process_text_label">Whiplash</string>
+</resources>
