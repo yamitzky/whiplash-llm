@@ -1,58 +1,89 @@
 package com.yamitzky.whiplash.android
 
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import android.os.Build
+import androidx.lifecycle.ViewModel
+import com.yamitzky.whiplash.android.ui.InputScreen
+import com.yamitzky.whiplash.android.ui.ModelEditScreen
+import com.yamitzky.whiplash.android.ui.ProviderScreen
+import com.yamitzky.whiplash.android.ui.RoleEditScreen
+import com.yamitzky.whiplash.android.ui.SettingsScreen
+import com.yamitzky.whiplash.shared.model.BackendProvider
 
+/** 画面の積み重ね。画面が 5 つしかないので、ナビゲーションのライブラリを使わずに持つ。 */
+sealed class Screen {
+    data object Input : Screen()
+    data object Settings : Screen()
+    data class RoleEdit(val roleId: String?) : Screen()
+    data class Provider(val provider: BackendProvider) : Screen()
+    data class ModelEdit(val modelId: String?) : Screen()
+}
+
+class Navigation : ViewModel() {
+    val stack = mutableStateListOf<Screen>(Screen.Input)
+    val current: Screen get() = stack.last()
+
+    fun push(screen: Screen) { stack.add(screen) }
+    fun pop() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
+    fun reset() { stack.clear(); stack.add(Screen.Input) }
+}
+
+/**
+ * 入口はすべてこの Activity に来る (ランチャー、文字選択メニュー、共有、タイル)。
+ * launchMode は singleTask で、2 回目以降の入力は onNewIntent で受ける。
+ */
 class MainActivity : ComponentActivity() {
+    private val input: InputViewModel by viewModels()
+    private val navigation: Navigation by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 画面の回転で作り直されたときは、同じ Intent をもう一度受けない。
+        // savedInstanceState では判断しない。プロセスが終わった後のタスクに新しい Intent が届くと、
+        // 保存した状態から作り直されつつ新しい Intent を持って onCreate に来るため。
+        if (!input.receivedLaunchIntent) {
+            input.receivedLaunchIntent = true
+            receive(intent)
+        }
         setContent {
             WhiplashTheme {
-                ChatScreen(viewModel())
+                BackHandler(enabled = navigation.stack.size > 1) { navigation.pop() }
+                val container = (application as WhiplashApplication).container
+                when (val screen = navigation.current) {
+                    Screen.Input -> InputScreen(input, container, onOpenSettings = { navigation.push(Screen.Settings) })
+                    Screen.Settings -> SettingsScreen(container, navigation, this)
+                    is Screen.RoleEdit -> RoleEditScreen(container, screen.roleId, onDone = navigation::pop)
+                    is Screen.Provider -> ProviderScreen(container, screen.provider, onDone = navigation::pop)
+                    is Screen.ModelEdit -> ModelEditScreen(container, screen.modelId, onDone = navigation::pop)
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        receive(intent)
+    }
+
+    private fun receive(intent: Intent) {
+        if (intent.action != Intent.ACTION_MAIN) navigation.reset()
+        input.handleIntent(intent)
     }
 }
 
@@ -66,91 +97,6 @@ private fun WhiplashTheme(content: @Composable () -> Unit) {
         else -> lightColorScheme()
     }
     MaterialTheme(colorScheme = colors, content = content)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChatScreen(viewModel: ChatViewModel) {
-    var showSettings by rememberSaveable { mutableStateOf(false) }
-    val keyboard = LocalSoftwareKeyboardController.current
-    // 初回は接続先が無く送れないので、先に設定を開く。
-    LaunchedEffect(Unit) { if (!viewModel.isConfigured) showSettings = true }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Whiplash") },
-                actions = { TextButton(onClick = { showSettings = true }) { Text("接続先") } },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier.padding(padding).padding(16.dp).fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedTextField(
-                value = viewModel.input,
-                onValueChange = { viewModel.input = it },
-                label = { Text("テキスト") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 6,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (viewModel.isGenerating) {
-                    Button(onClick = viewModel::stop) { Text("停止") }
-                } else {
-                    Button(
-                        onClick = {
-                            if (viewModel.isConfigured) {
-                                // キーボードが返答の欄を隠すので、送ったら閉じる。
-                                keyboard?.hide()
-                                viewModel.send()
-                            } else {
-                                showSettings = true
-                            }
-                        },
-                        enabled = viewModel.input.isNotBlank(),
-                    ) { Text("送信") }
-                }
-            }
-            ResponseCard(viewModel.output, viewModel.error, Modifier.fillMaxWidth().weight(1f))
-        }
-    }
-
-    if (showSettings) {
-        ConnectionDialog(
-            initial = remember { viewModel.connectionForm() },
-            onDismiss = { showSettings = false },
-            onSave = {
-                viewModel.saveConnection(it)
-                showSettings = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun ResponseCard(text: String, error: String?, modifier: Modifier) {
-    val (thinking, body) = splitThinking(text)
-    Card(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (thinking != null) {
-                Text(thinking, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (body.isNotEmpty()) {
-                Text(body, style = MaterialTheme.typography.bodyLarge)
-            } else if (error == null && thinking == null) {
-                Text("返答はここに表示されます", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (error != null) {
-                Text(error, color = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
 }
 
 /**
@@ -169,50 +115,3 @@ internal fun splitThinking(text: String): Pair<String?, String> {
 
 private const val THINKING_OPEN = "<thinking>"
 private const val THINKING_CLOSE = "</thinking>"
-
-@Composable
-private fun ConnectionDialog(initial: ConnectionForm, onDismiss: () -> Unit, onSave: (ConnectionForm) -> Unit) {
-    var endpoint by rememberSaveable { mutableStateOf(initial.endpoint) }
-    var modelIdentifier by rememberSaveable { mutableStateOf(initial.modelIdentifier) }
-    var apiKey by rememberSaveable { mutableStateOf(initial.apiKey) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("接続先") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("OpenAI 互換の Chat Completions API に送ります。", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(
-                    value = endpoint,
-                    onValueChange = { endpoint = it },
-                    label = { Text("URL") },
-                    placeholder = { Text("http://localhost:1234/v1") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-                )
-                OutlinedTextField(
-                    value = modelIdentifier,
-                    onValueChange = { modelIdentifier = it },
-                    label = { Text("モデル ID") },
-                    singleLine = true,
-                    // モデル ID は "openai/gpt-4o" や "llama3.2:3b" のような英数字と記号なので、URL 用のキーボードを出す。
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-                )
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("API キー (任意)") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onSave(ConnectionForm(endpoint, modelIdentifier, apiKey)) },
-                enabled = endpoint.isNotBlank() && modelIdentifier.isNotBlank(),
-            ) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } },
-    )
-}

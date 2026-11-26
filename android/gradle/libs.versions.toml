@@ -7,10 +7,15 @@ agp = "9.5.3"
 compose-bom = "2026.09.00"
 activity-compose = "1.13.0"
 lifecycle = "2.11.1"
+material-icons = "1.7.8"
+markdown-renderer = "0.46.0"
+mlkit-genai-prompt = "1.0.0-beta5"
+mlkit-text-ja = "16.0.1"
 # okhttp 5.5 (shared の Ktor が使う) と androidx.core 1.19 が compileSdk 37 を要る。
 android-compileSdk = "37"
 android-targetSdk = "36"
-android-minSdk = "26"
+# ImageDecoder (写真の向きを反映して読む) が API 28 から。
+android-minSdk = "28"
 
 [libraries]
 whiplash-shared = { module = "com.yamitzky.whiplash:shared" }
@@ -22,6 +27,14 @@ compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+compose-material-icons = { module = "androidx.compose.material:material-icons-extended", version.ref = "material-icons" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown-renderer" }
+# Gemini Nano。安定版がまだ無く、beta が最新 (2026-11 時点)。
+mlkit-genai-prompt = { module = "com.google.mlkit:genai-prompt", version.ref = "mlkit-genai-prompt" }
+# OCR。モデルを APK に入れる版。Google Play 開発者サービスから取る版は、インストール直後に
+# モデルが届いておらず、最初の OCR が "Waiting for the text optional module to be downloaded" で失敗した。
+mlkit-text-recognition-ja = { module = "com.google.mlkit:text-recognition-japanese", version.ref = "mlkit-text-ja" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
