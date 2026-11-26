@@ -138,3 +138,8 @@ iOSInjectionProject/
 
 # Per-developer signing settings
 Configs/Local.xcconfig
+
+# Kotlin Multiplatform (shared/)
+.gradle/
+.kotlin/
+local.properties
